@@ -4,7 +4,7 @@ module rwa_asset {
     use sui::object::{Self, ID};
     use sui::tx_context::TxContext;
     use sui::option;
-    use 0xYourAddr::issuer_registry;
+    use 0xYourAddr::issuer_registry::{self, IssuerCap};
 
     /// Enum to distinguish asset categories
     public enum AssetType {
@@ -14,11 +14,6 @@ module rwa_asset {
         Stocks,
         CarbonCredit,
         Custom
-    }
-
-    /// Capability required to mint assets (issued by issuer_registry)
-    public struct IssuerCap has key {
-        issuer: address,
     }
 
     /// Unique NFT-based asset structure

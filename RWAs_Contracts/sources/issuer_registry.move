@@ -12,7 +12,7 @@ module your_address::issuer_registry {
         issuers: vector<IssuerInfo>,
     }
 
-    /// Public struct used by rwa_asset module for access control
+    /// Public struct used by rwa_asset module for access control i.e. Capability object given to a verified issuer
     public struct IssuerCap has key {
         issuer: address,
     }
@@ -69,6 +69,17 @@ module your_address::issuer_registry {
             };
             i = i + 1;
         };
+    }
+
+    /// Admin-only: Issue an IssuerCap to the verified issuer
+    public fun issue_cap(
+        registry: &IssuerRegistry,
+        issuer: address,
+        ctx: &mut TxContext
+    ): IssuerCap {
+        assert!(tx_context::sender(ctx) == registry.admin, 2);
+        assert!(is_valid_issuer(registry, issuer), 3);
+        IssuerCap { issuer }
     }
 
     /// Public: check if address is active issuer
