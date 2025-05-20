@@ -1,50 +1,48 @@
 module <your_address>::marketplace {
 
     use sui::object::{Self, ID, UID};
-    use sui::tx_context::TxContext;
+    use sui::tx_context::{Self, TxContext};
     use sui::transfer;
+    use sui::coin::{Self, Coin};
     use std::option::{Self, Option};
     use std::string::String;
-    use std::vector;
-    use std::balance::{Self, Balance};
-    use sui::coin::{Self, Coin};
 
-    use <your_address>::rwa_asset::{RWAAssetNFT, RWAAssetFT, AssetType};
-    use <your_address>::admin::{AdminCap};
-    use <your_address>::issuer_registry::{IssuerCap};
+    use <your_address>::rwa_asset::{Self, RWAAssetNFT, RWAAssetFT, AssetType};
+    use <your_address>::issuer_registry::{Self, IssuerCap};
+    use <your_address>::admin::{Self, AdminCap};
 
-    /// Enum to distinguish asset listing types
+    /// Enum to distinguish listing type
     public enum ListingType {
         NFT,
         FT
     }
 
-    /// Listing for an NFT-like asset
+    /// NFT Listing
     struct NFTListing has key {
         id: UID,
-        asset_id: ID,
         seller: address,
         price: u64,
         asset_type: AssetType,
+        nft: RWAAssetNFT,
     }
 
-    /// Listing for a fungible token-based asset
+    /// FT Listing
     struct FTListing has key {
         id: UID,
-        asset_id: ID,
         seller: address,
-        amount: u64,
         price_per_unit: u64,
+        amount: u64,
         asset_type: AssetType,
+        ft: RWAAssetFT,
     }
 
-    /// Marketplace state (for pause control, can be expanded)
+    /// Marketplace state (e.g. paused or not)
     struct MarketplaceState has key {
         id: UID,
         paused: bool,
     }
 
-    /// Initialize marketplace state
+    /// Initialize the marketplace state object
     public fun init_marketplace(ctx: &mut TxContext): MarketplaceState {
         MarketplaceState {
             id: object::new(ctx),
@@ -52,17 +50,17 @@ module <your_address>::marketplace {
         }
     }
 
-    /// Admin: Pause the marketplace
-    public fun pause_marketplace(admin: &AdminCap, state: &mut MarketplaceState) {
+    /// Admin pauses the marketplace
+    public fun pause_marketplace(_admin: &AdminCap, state: &mut MarketplaceState) {
         state.paused = true;
     }
 
-    /// Admin: Unpause the marketplace
-    public fun unpause_marketplace(admin: &AdminCap, state: &mut MarketplaceState) {
+    /// Admin unpauses the marketplace
+    public fun unpause_marketplace(_admin: &AdminCap, state: &mut MarketplaceState) {
         state.paused = false;
     }
 
-    /// List a unique NFT asset for sale
+    /// List an NFT asset by issuer
     public entry fun list_asset_nft(
         state: &MarketplaceState,
         nft: RWAAssetNFT,
@@ -70,83 +68,70 @@ module <your_address>::marketplace {
         ctx: &mut TxContext
     ): NFTListing {
         assert!(!state.paused, 0);
-        let seller = tx_context::sender(ctx);
-        assert!(nft.issuer == seller, 1); // Only issuer can list their asset
-
+        let sender = tx_context::sender(ctx);
+        assert!(nft.issuer == sender, 1); // Only the issuer can list
         NFTListing {
             id: object::new(ctx),
-            asset_id: nft.id,
-            seller,
+            seller: sender,
             price,
             asset_type: nft.asset_type,
+            nft,
         }
     }
 
-    /// List a portion of a fungible asset
+    /// List a portion of a fungible token asset
     public entry fun list_asset_ft(
         state: &MarketplaceState,
-        asset: &mut RWAAssetFT,
+        mut ft: RWAAssetFT,
         amount: u64,
         price_per_unit: u64,
         ctx: &mut TxContext
     ): FTListing {
         assert!(!state.paused, 0);
-        let seller = tx_context::sender(ctx);
-        assert!(asset.issuer == seller, 1);
-        assert!(amount > 0 && amount <= asset.total_supply, 2);
+        let sender = tx_context::sender(ctx);
+        assert!(ft.issuer == sender, 1);
+        assert!(amount > 0 && amount <= ft.total_supply, 2);
 
-        asset.total_supply = asset.total_supply - amount;
+        ft.total_supply = ft.total_supply - amount;
 
         FTListing {
             id: object::new(ctx),
-            asset_id: asset.id,
-            seller,
-            amount,
+            seller: sender,
             price_per_unit,
-            asset_type: asset.asset_type,
+            amount,
+            asset_type: ft.asset_type,
+            ft,
         }
     }
 
-    /// Buy an NFT asset
+    /// Buy listed NFT
     public entry fun buy_asset_nft(
         state: &MarketplaceState,
         listing: NFTListing,
-        payment: Coin,
+        mut payment: Coin,
         ctx: &mut TxContext
     ): RWAAssetNFT {
         assert!(!state.paused, 0);
         let buyer = tx_context::sender(ctx);
-        let price = listing.price;
-        assert!(coin::value(&payment) >= price, 1);
+        let value = coin::value(&payment);
+        assert!(value >= listing.price, 1);
 
-        let change = coin::split(&mut payment, coin::value(&payment) - price);
-        transfer::transfer(change, buyer); // return change if overpaid
-        transfer::transfer(payment, listing.seller); // send payment
+        let change = value - listing.price;
+        if (change > 0) {
+            let refund = coin::split(&mut payment, change);
+            transfer::transfer(refund, buyer);
+        }
 
-        // Normally you'd load the RWAAssetNFT from storage, simulate here
-        // In real implementation, NFTs must be passed in or loaded via dynamic field
-        // We assume NFT transfer happens externally for simplicity
-
-        let asset = RWAAssetNFT {
-            id: listing.asset_id,
-            issuer: listing.seller,
-            metadata_uri: string::utf8(b""),
-            asset_type: listing.asset_type,
-            valuation: price,
-            maturity: option::none(),
-            apy: option::none()
-        };
-
-        transfer::transfer(asset, buyer);
+        transfer::transfer(payment, listing.seller);
+        transfer::transfer(listing.nft, buyer);
         object::delete(listing);
-        asset
     }
 
-    /// Buy from a fungible token listing
+    /// Buy from FT listing (receives units and updates listing)
     public entry fun buy_asset_ft(
         state: &MarketplaceState,
         listing: &mut FTListing,
-        payment: Coin,
+        mut payment: Coin,
         ctx: &mut TxContext
     ): u64 {
         assert!(!state.paused, 0);
@@ -156,48 +141,37 @@ module <your_address>::marketplace {
         let units = value / listing.price_per_unit;
         assert!(units > 0 && units <= listing.amount, 1);
 
-        let total_cost = units * listing.price_per_unit;
-        let refund = value - total_cost;
+        let total_price = units * listing.price_per_unit;
+        let refund = value - total_price;
 
         listing.amount = listing.amount - units;
         transfer::transfer(payment, listing.seller);
 
         if (refund > 0) {
-            let change = coin::split(&mut payment, refund);
-            transfer::transfer(change, buyer);
-        };
+            let refund_coin = coin::split(&mut payment, refund);
+            transfer::transfer(refund_coin, buyer);
+        }
 
         if (listing.amount == 0) {
             object::delete(listing);
-        };
+        }
 
-        // In a real impl, you'd mint or transfer FT units to buyer
+        // In a real-world scenario, you'd mint or transfer units of FT to buyer
         units
     }
 
-    /// Cancel NFT listing
+    /// Cancel NFT listing by seller
     public entry fun cancel_nft_listing(
         listing: NFTListing,
         ctx: &mut TxContext
     ): RWAAssetNFT {
         let sender = tx_context::sender(ctx);
         assert!(sender == listing.seller, 0);
-
-        let asset = RWAAssetNFT {
-            id: listing.asset_id,
-            issuer: listing.seller,
-            metadata_uri: string::utf8(b""),
-            asset_type: listing.asset_type,
-            valuation: listing.price,
-            maturity: option::none(),
-            apy: option::none()
-        };
-
         object::delete(listing);
-        asset
+        listing.nft
     }
 
-    /// Cancel FT listing
+    /// Cancel FT listing and return the tokens
     public entry fun cancel_ft_listing(
         listing: &mut FTListing,
         asset: &mut RWAAssetFT,
@@ -205,7 +179,6 @@ module <your_address>::marketplace {
     ) {
         let sender = tx_context::sender(ctx);
         assert!(sender == listing.seller, 0);
-
         asset.total_supply = asset.total_supply + listing.amount;
         listing.amount = 0;
         object::delete(listing);
