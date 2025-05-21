@@ -1,0 +1,10 @@
+[package]
+name = "RWAsContracts"
+version = "0.0.1"
+published-at = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet" }
+
+[addresses]
+rwa = "0x0"
