@@ -74,11 +74,4 @@ module rwaasset::rwaasset {
         transfer::transfer(ft, cap.issuer);
     }
 
-    public entry fun burn_asset_nft(nft: RWAAssetNFT, _ctx: &mut TxContext) {
-        object::delete(nft);
-    }
-
-    public entry fun burn_asset_ft(ft: RWAAssetFT, _ctx: &mut TxContext) {
-        object::delete(ft);
-    }
 }
