@@ -198,17 +198,7 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
       <AnimatePresence>
         {active ? (
           <div className="fixed inset-0 grid place-items-center z-[100] p-4 overflow-auto">
-            <motion.button
-              key={`button-${active.title}-${id}`}
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.05 } }}
-              className="flex absolute top-4 right-4 items-center justify-center bg-white rounded-full h-8 w-8 shadow-lg z-[101]"
-              onClick={() => setActive(null)}
-            >
-              <CloseIcon />
-            </motion.button>
+            
             <div ref={ref} className="relative">
               <ExpandedDetailView {...active} onClose={() => setActive(null)} />
             </div>

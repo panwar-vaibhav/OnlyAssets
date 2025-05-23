@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ListingGrid from './ListingGrid';
+import MarketplaceListing from './MarketplaceListing';
 import { MarketData } from './types';
 
 interface MarketTabsProps {
@@ -9,7 +9,7 @@ interface MarketTabsProps {
 
 const MarketTabs: React.FC<MarketTabsProps> = ({ marketData }) => {
   return (
-    <Tabs defaultValue="realEstate" className="w-full bg-white rounded-xl p-4">
+    <Tabs defaultValue="realEstate" className="w-full rounded-xl p-4">
       <TabsList className="max-w-2xl mx-auto grid grid-cols-3 gap-3 h-16 p-0 mb-8 bg-gray-50/50 rounded-lg">
         <TabsTrigger 
           value="realEstate"
@@ -73,15 +73,13 @@ const MarketTabs: React.FC<MarketTabsProps> = ({ marketData }) => {
       </TabsList>
 
       <TabsContent value="realEstate">
-        <ListingGrid items={marketData.realEstate} />
+        <MarketplaceListing items={marketData.realEstate} />
       </TabsContent>
-
       <TabsContent value="invoices">
-        <ListingGrid items={marketData.invoices} />
+        <MarketplaceListing items={marketData.invoices} />
       </TabsContent>
-
       <TabsContent value="commodities">
-        <ListingGrid items={marketData.commodities} />
+        <MarketplaceListing items={marketData.commodities} />
       </TabsContent>
     </Tabs>
   );
