@@ -1,13 +1,8 @@
-module rwa_asset {
-
+module rwaasset::rwaasset {
     use std::string;
-    use sui::object::{Self, ID};
-    use sui::tx_context::TxContext;
-    use sui::option;
-    use 0xYourAddr::issuer_registry::{self, IssuerCap};
+    use issuerregistry::issuer_registry::{IssuerCap, IssuerRegistry, is_valid_issuer};
 
-    /// Enum to distinguish asset categories
-    public enum AssetType {
+    public enum AssetType has store {
         RealEstate,
         Invoice,
         Gold,
@@ -16,9 +11,8 @@ module rwa_asset {
         Custom
     }
 
-    /// Unique NFT-based asset structure
     public struct RWAAssetNFT has key, store {
-        id: ID,
+        id: UID,
         issuer: address,
         metadata_uri: string::String,
         asset_type: AssetType,
@@ -27,16 +21,14 @@ module rwa_asset {
         apy: option::Option<u64>,
     }
 
-    /// Fungible token-based asset structure
     public struct RWAAssetFT has key, store {
-        id: ID,
+        id: UID,
         issuer: address,
         metadata_uri: string::String,
         asset_type: AssetType,
         total_supply: u64,
     }
 
-    /// Mint a unique NFT-like asset
     public entry fun mint_asset_nft(
         cap: &IssuerCap,
         metadata_uri: string::String,
@@ -44,12 +36,12 @@ module rwa_asset {
         valuation: u64,
         maturity: option::Option<u64>,
         apy: option::Option<u64>,
-        registry: &issuer_registry::IssuerRegistry,
+        registry: &IssuerRegistry,
         ctx: &mut TxContext
-    ): RWAAssetNFT {
-        assert!(issuer_registry::is_valid_issuer(registry, cap.issuer), 0);
+    ) {
+        assert!(is_valid_issuer(registry, cap.issuer), 0);
 
-        RWAAssetNFT {
+        let nft = RWAAssetNFT {
             id: object::new(ctx),
             issuer: cap.issuer,
             metadata_uri,
@@ -57,36 +49,35 @@ module rwa_asset {
             valuation,
             maturity,
             apy
-        }
+        };
+        transfer::transfer(nft, cap.issuer);
     }
 
-    /// Mint a fungible token-based asset
     public entry fun mint_asset_ft(
         cap: &IssuerCap,
         metadata_uri: string::String,
         asset_type: AssetType,
         total_supply: u64,
-        registry: &issuer_registry::IssuerRegistry,
+        registry: &IssuerRegistry,
         ctx: &mut TxContext
-    ): RWAAssetFT {
+    ) {
         assert!(total_supply > 0, 1);
-        assert!(issuer_registry::is_valid_issuer(registry, cap.issuer), 0);
+        assert!(is_valid_issuer(registry, cap.issuer), 0);
 
-        RWAAssetFT {
+        let ft = RWAAssetFT {
             id: object::new(ctx),
             issuer: cap.issuer,
             metadata_uri,
             asset_type,
             total_supply
-        }
+        };
+        transfer::transfer(ft, cap.issuer);
     }
 
-    /// Optional: Burn NFT
     public entry fun burn_asset_nft(nft: RWAAssetNFT, _ctx: &mut TxContext) {
         object::delete(nft);
     }
 
-    /// Optional: Burn FT
     public entry fun burn_asset_ft(ft: RWAAssetFT, _ctx: &mut TxContext) {
         object::delete(ft);
     }

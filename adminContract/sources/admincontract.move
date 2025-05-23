@@ -1,15 +1,15 @@
-module <your_address>::admin {
-
+address '0x0' {
+    
+    module adminContract::admin {
     use sui::object::{Self, UID, ID, new};
     use sui::tx_context::{Self, TxContext, sender};
     use sui::transfer;
     use sui::option::{Self, Option};
     use sui::table::{Self, Table};
 
-    use <your_address>::issuer_registry::{Self, IssuerRegistry, init_registry};
-    use <your_address>::marketplace::{Self, FungibleBalanceBook, init_balance_book};
+    use rwa::issuer_registry::{Self, IssuerRegistry, init_registry};
+    use rwa::marketplace::{Self, FungibleBalanceBook, init_balance_book};
 
-    /// Error codes
     const E_NOT_ADMIN: u64 = 0;
     const E_ALREADY_PAUSED: u64 = 1;
     const E_ALREADY_ACTIVE: u64 = 2;
@@ -89,8 +89,9 @@ module <your_address>::admin {
         &state.balance_book
     }
 
-    /// Internal helper
     fun is_admin(cap: &AdminCap): bool {
         cap.admin == sender()
     }
+}
+
 }
