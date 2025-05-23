@@ -1,21 +1,10 @@
-/*
-/// Module: marketplace
-module marketplace::marketplace;
-*/
 module marketplace::marketplace {
     use sui::table::{Self, Table};
-    use sui::object::{Self, ID};
-    use sui::transfer;
     use sui::coin::{Self, Coin};
-    use sui::tx_context::{Self, TxContext};
-    use sui::balance;
-    use sui::error;
-    use sui::option::{Self, Option};
     use sui::timestamp;
-
-    use rwa::rwa_asset::{Self as RWAAsset, RWAAssetNFT, RWAAssetFT, transfer_asset_nft, transfer_asset_ft, withdraw_ft};
-    use rwa::issuer_registry::{Self as IssuerRegistry};
-    use rwa::admin::{Self as Admin, AdminCap};
+    use rwaasset::rwaasset::{RWAAssetNFT, RWAAssetFT, transfer_asset_nft, transfer_asset_ft, withdraw_ft};
+    use issuerregistry::issuer_registry::{IssuerRegistry, is_issuer};
+    use admin::admin::{AdminCap, assert_admin};
 
     const E_NOT_AUTHORIZED: u64 = 0;
     const E_NOT_FOUND: u64 = 1;
@@ -25,8 +14,8 @@ module marketplace::marketplace {
     const E_INVALID_PAYMENT: u64 = 5;
 
     /// Main Marketplace object
-    struct Marketplace has key {
-        id: ID,
+    public struct Marketplace has key {
+        id: UID,
         listings: Table<ID, MarketplaceListing>,
         ft_escrow: Table<ID, Coin<SUI>>,
         nft_escrow: Table<ID, RWAAssetNFT>,
@@ -34,7 +23,7 @@ module marketplace::marketplace {
     }
 
     /// A single asset listing
-    struct MarketplaceListing has copy, drop, store {
+    public struct MarketplaceListing has copy, drop, store {
         id: ID,
         asset_id: ID,
         is_nft: bool,
@@ -43,7 +32,8 @@ module marketplace::marketplace {
         timestamp: u64
     }
 
-    public fun init(ctx: &mut TxContext): Marketplace {
+    /// Initialize a new marketplace
+    public entry fun init(ctx: &mut TxContext): Marketplace {
         Marketplace {
             id: object::new(ctx),
             listings: table::new(ctx),
@@ -53,17 +43,20 @@ module marketplace::marketplace {
         }
     }
 
-    public fun pause(admin: &AdminCap, marketplace: &mut Marketplace) {
-        Admin::assert_admin(admin);
+    /// Pause the marketplace (admin only)
+    public entry fun pause(admin: &AdminCap, marketplace: &mut Marketplace) {
+        assert_admin(admin);
         marketplace.paused = true;
     }
 
-    public fun unpause(admin: &AdminCap, marketplace: &mut Marketplace) {
-        Admin::assert_admin(admin);
+    /// Unpause the marketplace (admin only)
+    public entry fun unpause(admin: &AdminCap, marketplace: &mut Marketplace) {
+        assert_admin(admin);
         marketplace.paused = false;
     }
 
-    public fun list_asset_nft(
+    /// List an NFT asset
+    public entry fun list_asset_nft(
         marketplace: &mut Marketplace,
         issuer_registry: &IssuerRegistry,
         nft: RWAAssetNFT,
@@ -71,7 +64,7 @@ module marketplace::marketplace {
         ctx: &mut TxContext
     ) {
         assert!(!marketplace.paused, E_PAUSED);
-        assert!(IssuerRegistry::is_issuer(issuer_registry, &nft.issuer), E_NOT_AUTHORIZED);
+        assert!(is_issuer(issuer_registry, &nft.issuer), E_NOT_AUTHORIZED);
 
         let id = object::new(ctx);
         let ts = timestamp::now_ms();
@@ -84,12 +77,12 @@ module marketplace::marketplace {
             timestamp: ts
         };
 
-        // Escrow NFT in contract custody
         table::add(&mut marketplace.nft_escrow, nft.id, nft);
         table::add(&mut marketplace.listings, id, listing);
     }
 
-    public fun list_asset_ft(
+    /// List a fungible asset
+    public entry fun list_asset_ft(
         marketplace: &mut Marketplace,
         issuer_registry: &IssuerRegistry,
         ft: &mut RWAAssetFT,
@@ -98,7 +91,7 @@ module marketplace::marketplace {
         ctx: &mut TxContext
     ) {
         assert!(!marketplace.paused, E_PAUSED);
-        assert!(IssuerRegistry::is_issuer(issuer_registry, &ft.issuer), E_NOT_AUTHORIZED);
+        assert!(is_issuer(issuer_registry, &ft.issuer), E_NOT_AUTHORIZED);
 
         let id = object::new(ctx);
         let ts = timestamp::now_ms();
@@ -117,7 +110,8 @@ module marketplace::marketplace {
         table::add(&mut marketplace.listings, id, listing);
     }
 
-    public fun buy_asset(
+    /// Buy an asset (NFT or FT)
+    public entry fun buy_asset(
         marketplace: &mut Marketplace,
         listing_id: ID,
         payment: Coin<SUI>,
@@ -131,7 +125,9 @@ module marketplace::marketplace {
         let protocol_fee = listing.price / 1000; // 0.1%
         let seller_share = listing.price - protocol_fee;
         let seller_coin = coin::split(&payment, seller_share);
-        transfer::transfer(seller_coin, listing.seller);
+        transfer::public_transfer(seller_coin, listing.seller);
+
+        // TODO: Send protocol_fee to a treasury address if desired
 
         if listing.is_nft {
             let nft = table::remove(&mut marketplace.nft_escrow, listing.asset_id);
@@ -145,7 +141,8 @@ module marketplace::marketplace {
         transfer::public_transfer(payment, tx_context::sender(ctx));
     }
 
-    public fun cancel_listing(
+    /// Cancel a listing (seller only)
+    public entry fun cancel_listing(
         marketplace: &mut Marketplace,
         listing_id: ID,
         ctx: &mut TxContext
@@ -158,7 +155,7 @@ module marketplace::marketplace {
             transfer_asset_nft(nft, listing.seller);
         } else {
             let coin = table::remove(&mut marketplace.ft_escrow, listing_id);
-            transfer::transfer(coin, listing.seller);
+            transfer::public_transfer(coin, listing.seller);
         }
     }
 }
