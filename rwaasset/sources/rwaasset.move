@@ -1,6 +1,6 @@
 module rwaasset::rwaasset {
     use std::string;
-    use issuerregistry::issuer_registry::{IssuerCap, IssuerRegistry, is_valid_issuer};
+    use issuerregistry::issuer_registry::{IssuerCap, IssuerRegistry, is_valid_issuer, issuer};
 
     public enum AssetType has store {
         RealEstate,
