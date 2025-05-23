@@ -19,7 +19,7 @@ issuerregistry = { local = "../issuerregistry" }
 
 [addresses]
 rwaasset = "0x0"
-issuerregistry = "0x3592a17cefada32646ff0f9f2c30a0d48756997f86a001583140438bde5b7807"
+issuerregistry = "0x30a15d7b34edf9043c0ab10d91f42b12e101cf02058cc75b3afd26f37bf9ed01"
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
 # alice = "0xA11CE"

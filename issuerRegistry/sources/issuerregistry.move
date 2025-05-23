@@ -13,6 +13,11 @@ module issuerregistry::issuer_registry {
         issuer: address,
     }
 
+      // Public accessor for the issuer address in IssuerCap
+     public fun issuer(cap: &IssuerCap): address {
+         cap.issuer
+     }
+
     /// Issuer metadata
     public struct IssuerInfo has copy, drop, store {
         issuer: address,
