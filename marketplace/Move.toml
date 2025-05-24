@@ -22,9 +22,9 @@ admin = { local = "../admin" }
 
 [addresses]
 marketplace = "0x0"
-rwaasset = "0x8296838bb133a9650b5495e0c02be9869ed4ea9d5bf7d839f9aecb31a854fceb"
-issuerregistry = "0x64e58ad8ab4db950c7a556ac118003e3cae885ae2e18cf92a6b1131b3e4aba69"
-admin = "0x3"
+rwaasset = "0xf62c99a340ecd1ae3faf18133f007ee1a391335202291394d3fab96957ca6d1c"
+issuerregistry = "0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa"
+admin = "0x4834efbf750e8215714738f047a940dcb330431c61d95d5c544975ca97157d77"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
