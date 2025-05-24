@@ -2,13 +2,16 @@
 
 [move]
 version = 3
-manifest_digest = "4ECA6C4067DF6395FAD167AC00D884983561CB745AB4E91852B63A20A58CEFD3"
-deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
+manifest_digest = "65AAB392B04D00E9391A1702B6C91BBE6360F5D2DA6BC876C7E8273EE62D0586"
+deps_digest = "CAFAD8A7CF51067FB4358215BECB86BD100DD64E57C2AC8A7AE7D74B688F5965"
 dependencies = [
   { id = "Bridge", name = "Bridge" },
   { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
   { id = "SuiSystem", name = "SuiSystem" },
+  { id = "admin", name = "admin" },
+  { id = "issuerregistry", name = "issuerregistry" },
+  { id = "rwaasset", name = "rwaasset" },
 ]
 
 [[move.package]]
@@ -42,15 +45,36 @@ dependencies = [
   { id = "Sui", name = "Sui" },
 ]
 
-[move.toolchain-version]
-compiler-version = "1.49.1"
-edition = "2024.beta"
-flavor = "sui"
+[[move.package]]
+id = "admin"
+source = { local = "../admin" }
 
-[env]
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+]
 
-[env.testnet]
-chain-id = "4c78adac"
-original-published-id = "0x64e58ad8ab4db950c7a556ac118003e3cae885ae2e18cf92a6b1131b3e4aba69"
-latest-published-id = "0x64e58ad8ab4db950c7a556ac118003e3cae885ae2e18cf92a6b1131b3e4aba69"
-published-version = "1"
+[[move.package]]
+id = "issuerregistry"
+source = { local = "../issuerregistry" }
+
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+]
+
+[[move.package]]
+id = "rwaasset"
+source = { local = "../rwaasset" }
+
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+  { id = "issuerregistry", name = "issuerregistry" },
+]
