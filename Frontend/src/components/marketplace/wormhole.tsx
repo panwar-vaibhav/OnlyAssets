@@ -17,7 +17,7 @@ const WormholeModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
       <div
-        className="relative w-full max-w-2xl rounded-2xl shadow-2xl p-0"
+        className="relative w-full max-w-2xl rounded-2xl shadow-2xl p-0 wormhole-modal-hide-scrollbar"
         style={{
           background: 'rgba(30, 32, 48, 0.65)', // more transparent
           boxShadow: '0 4px 32px 0 rgba(0,0,0,0.25)',
@@ -32,7 +32,7 @@ const WormholeModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open,
           .wormhole-modal-hide-scrollbar::-webkit-scrollbar { display: none; }
           .wormhole-modal-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-        <div className="wormhole-modal-hide-scrollbar" style={{maxHeight: '90vh', overflow: 'auto'}}>
+        <div style={{maxHeight: '90vh', overflow: 'auto'}}>
           <button
             className="sticky top-2 right-2 float-right text-xl text-gray-400 hover:text-white z-10 bg-transparent border-none outline-none"
             onClick={onClose}

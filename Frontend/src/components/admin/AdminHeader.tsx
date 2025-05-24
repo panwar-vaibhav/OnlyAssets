@@ -1,6 +1,7 @@
 import React from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { ConnectButton } from '@mysten/dapp-kit';
 
 interface AdminHeaderProps {
   onPause: () => void;
@@ -18,24 +19,28 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ onPause, onResume }) => (
           Manage your platform settings
         </p>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="ml-auto">
-            <span className="mr-2">☰</span> Quick Actions
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={onPause}>
-            <span className="mr-2">⏸️</span> Pause Marketplace
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onResume}>
-            <span className="mr-2">▶️</span> Resume Marketplace
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <span className="mr-2">🔍</span> Check Status
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Move ConnectButton to the left of Quick Actions */}
+      <div className="flex items-center gap-4">
+        <ConnectButton />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="ml-auto">
+              <span className="mr-2">☰</span> Quick Actions
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={onPause}>
+              <span className="mr-2">⏸️</span> Pause Marketplace
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onResume}>
+              <span className="mr-2">▶️</span> Resume Marketplace
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <span className="mr-2">🔍</span> Check Status
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   </div>
 );
