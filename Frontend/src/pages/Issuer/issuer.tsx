@@ -6,12 +6,16 @@ import { Label } from '@/components/ui/label';
 import { BottomGradient, LabelInputContainer } from '@/components/ui/form-utils';
 import { BackgroundLines } from "@/components/ui/background-lines";
 import Header from '@/components/Header';
+import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
 
 const assetTypes = [
   'Real Estate',
   'Invoice',
   'Commodity',
 ];
+
+const RWA_ASSET_PACKAGE_ID = '0x8296838bb133a9650b5495e0c02be9869ed4ea9d5bf7d839f9aecb31a854fceb';
 
 const Issuer: React.FC = () => {
   const [showNFTDialog, setShowNFTDialog] = useState(false);
@@ -35,19 +39,118 @@ const Issuer: React.FC = () => {
   const [ftTotalSupply, setFtTotalSupply] = useState('');
   const [ftRegistry, setFtRegistry] = useState('');
 
+  const currentAccount = useCurrentAccount();
+  const { mutate: signAndExecuteMintNFT } = useSignAndExecuteTransaction();
+  const { mutate: signAndExecuteMintFT } = useSignAndExecuteTransaction();
+  const { mutate: connectWallet } = useConnectWallet();
+  const wallets = useWallets();
+  const [showWallets, setShowWallets] = useState(false);
+  const [pendingMint, setPendingMint] = useState<'nft' | 'ft' | null>(null);
+
+  // Helper to trigger the ConnectButton in the header
+  const triggerHeaderConnect = () => {
+    const headerConnectBtn = document.querySelector(
+      '.admin-header-connect-btn, [data-dapp-kit-connect-button]'
+    ) as HTMLElement | null;
+    if (headerConnectBtn) {
+      headerConnectBtn.click();
+    }
+  };
+
+  // Helper to connect wallet, then mint
+  const ensureWalletAndMint = async (mintType: 'nft' | 'ft', mintFn: () => void) => {
+    if (!currentAccount) {
+      setPendingMint(mintType);
+      setShowWallets(true);
+      return;
+    }
+    mintFn();
+  };
+
   // Handlers for NFT mint
-  const handleMintNFT = (e: React.FormEvent) => {
+  const handleMintNFT = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call Sui contract for mint_asset_nft
-    setShowNFTDialog(false);
+    if (!nftCap || !nftMetadataUri || nftAssetType === undefined || !nftValuation || !nftRegistry) return;
+    await ensureWalletAndMint('nft', () => {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_nft`,
+        arguments: [
+          tx.object(nftCap),
+          tx.pure.vector('u8', new TextEncoder().encode(nftMetadataUri)),
+          tx.pure.u8(Number(nftAssetType)),
+          tx.pure.u64(nftValuation),
+          tx.pure.bool(nftHasMaturity),
+          tx.pure.u64(nftHasMaturity ? Number(nftMaturity) : 0),
+          tx.pure.bool(nftHasApy),
+          tx.pure.u64(nftHasApy ? Number(nftApy) : 0),
+          tx.object(nftRegistry),
+        ],
+      });
+      signAndExecuteMintNFT({ transaction: tx, chain: 'sui:testnet' });
+      setShowNFTDialog(false);
+    });
   };
 
   // Handlers for FT mint
-  const handleMintFT = (e: React.FormEvent) => {
+  const handleMintFT = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call Sui contract for mint_asset_ft
-    setShowFTDialog(false);
+    if (!ftCap || !ftMetadataUri || ftAssetType === undefined || !ftTotalSupply || !ftRegistry) return;
+    await ensureWalletAndMint('ft', () => {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_ft`,
+        arguments: [
+          tx.object(ftCap),
+          tx.pure.vector('u8', new TextEncoder().encode(ftMetadataUri)),
+          tx.pure.u8(Number(ftAssetType)),
+          tx.pure.u64(ftTotalSupply),
+          tx.object(ftRegistry),
+        ],
+      });
+      signAndExecuteMintFT({ transaction: tx, chain: 'sui:testnet' });
+      setShowFTDialog(false);
+    });
   };
+
+  // Wallet selection dialog
+  const WalletSelectDialog = () => (
+    <Dialog open={showWallets} onOpenChange={setShowWallets}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect Wallet</DialogTitle>
+          <DialogDescription>Select a wallet to connect before minting.</DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-2">
+          {wallets.map((wallet) => (
+            <li key={wallet.name}>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  connectWallet(
+                    { wallet },
+                    {
+                      onSuccess: () => {
+                        setShowWallets(false);
+                        if (pendingMint === 'nft') {
+                          setTimeout(() => handleMintNFT(new Event('submit') as any), 100);
+                        } else if (pendingMint === 'ft') {
+                          setTimeout(() => handleMintFT(new Event('submit') as any), 100);
+                        }
+                        setPendingMint(null);
+                      },
+                    }
+                  );
+                }}
+              >
+                Connect to Sui wallet
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <div className="min-h-screen bg-black">
@@ -175,6 +278,8 @@ const Issuer: React.FC = () => {
               </form>
             </DialogContent>
           </Dialog>
+
+          <WalletSelectDialog />
         </div>
       </BackgroundLines>
     </div>
