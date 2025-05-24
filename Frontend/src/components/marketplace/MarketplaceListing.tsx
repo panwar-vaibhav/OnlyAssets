@@ -5,8 +5,11 @@ import { useOutsideClick } from '@/hooks/use-outside-click';
 import { ListingItem } from './types';
 import { CATEGORY_ICONS } from './constants';
 import { CloseIcon } from './CloseIcon';
+import { useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-const PACKAGE_ID = '0xf3523d1917b7e6bbae4b8ccfdfcf091f6759eb2a29b5a01480f029fca16e7dbf';
+const MARKETPLACE_PACKAGE_ID = '0xf3523d1917b7e6bbae4b8ccfdfcf091f6759eb2a29b5a01480f029fca16e7dbf';
 
 interface MarketplaceListingGridProps {
   items: ListingItem[];
@@ -20,6 +23,12 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
   } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
+  const currentAccount = useCurrentAccount();
+  const { mutate: signAndExecuteBuy } = useSignAndExecuteTransaction();
+  const { mutate: connectWallet } = useConnectWallet();
+  const wallets = useWallets();
+  const [showWallets, setShowWallets] = useState(false);
+  const [pendingBuy, setPendingBuy] = useState<any>(null);
 
   const sortedItems = React.useMemo(() => {
     let sortableItems = [...items];
@@ -61,6 +70,66 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
   }, [active]);
 
   useOutsideClick(ref, () => setActive(null));
+
+  const ensureWalletAndBuy = async (buyArgs: any, buyFn: () => void) => {
+    if (!currentAccount) {
+      setPendingBuy(buyArgs);
+      setShowWallets(true);
+      return;
+    }
+    buyFn();
+  };
+
+  const handleBuy = async (marketplaceId: string, listingId: string, paymentCoinId: string) => {
+    await ensureWalletAndBuy({ marketplaceId, listingId, paymentCoinId }, () => {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${MARKETPLACE_PACKAGE_ID}::marketplace::buy_asset`,
+        arguments: [
+          tx.object(marketplaceId),
+          tx.pure.address(listingId),
+          tx.object(paymentCoinId),
+        ],
+      });
+      signAndExecuteBuy({ transaction: tx, chain: 'sui:testnet' });
+    });
+  };
+
+  const WalletSelectDialog = () => (
+    <Dialog open={showWallets} onOpenChange={setShowWallets}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect Wallet</DialogTitle>
+          <DialogDescription>Select a wallet to connect before buying.</DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-2">
+          {wallets.map((wallet) => (
+            <li key={wallet.name}>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  connectWallet(
+                    { wallet },
+                    {
+                      onSuccess: () => {
+                        setShowWallets(false);
+                        if (pendingBuy) {
+                          setTimeout(() => handleBuy(pendingBuy.marketplaceId, pendingBuy.listingId, pendingBuy.paymentCoinId), 100);
+                          setPendingBuy(null);
+                        }
+                      },
+                    }
+                  );
+                }}
+              >
+                Connect to Sui wallet
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
 
   // Expandable Card
   const ExpandableCard: React.FC<ListingItem & { onClick: () => void; isExpanded?: boolean }> = ({
@@ -107,7 +176,15 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
         <div className="text-green-600">Earn up to {earnXP.toLocaleString()} XP</div>
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button onClick={e => { e.stopPropagation(); /* Handle buy action */ }} className="px-3 py-1.5 text-sm rounded-full font-medium bg-marketplace-blue text-white hover:bg-marketplace-blue/90">Buy</Button>
+          <Button
+            onClick={e => {
+              e.stopPropagation();
+              
+            }}
+            className="px-3 py-1.5 text-sm rounded-full font-medium bg-marketplace-blue text-white hover:bg-marketplace-blue/90"
+          >
+            Buy
+          </Button>
           <Button className="px-3 py-1.5 text-black text-sm rounded-full font-medium bg-gray-100 hover:bg-gray-200">View Details</Button>
         </div>
       </motion.div>
@@ -244,6 +321,7 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
           ))}
         </ul>
       </div>
+      <WalletSelectDialog />
     </>
   );
 };
