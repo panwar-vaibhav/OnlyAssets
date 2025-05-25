@@ -11,6 +11,8 @@ module marketplace::marketplace {
     const E_NOT_SELLER: u64 = 3;
     const E_PAUSED: u64 = 4;
     const E_INVALID_PAYMENT: u64 = 5;
+    const E_LISTING_NOT_FOUND: u64 = 6;
+    const E_ASSET_NOT_FOUND: u64 = 7;
 
     /// Main Marketplace object
     public struct Marketplace has key {
@@ -23,7 +25,6 @@ module marketplace::marketplace {
 
     /// A single asset listing
     public struct MarketplaceListing has copy, drop, store {
-        id: ID,
         asset_id: ID,
         is_nft: bool,
         seller: address,
@@ -62,16 +63,15 @@ module marketplace::marketplace {
         nft: RWAAssetNFT,
         price: u64,
         clock: &Clock,
-        ctx: &mut TxContext
+        _ctx: &mut TxContext
     ) {
         assert!(!marketplace.paused, E_PAUSED);
         assert!(is_valid_issuer(issuer_registry, nft_issuer(&nft)), E_NOT_AUTHORIZED);
 
-        let listing_id = object::new(ctx);
         let asset_id = object::id(&nft);
         let ts = sui::clock::timestamp_ms(clock);
+
         let listing = MarketplaceListing {
-            id: object::uid_to_inner(&listing_id),
             asset_id,
             is_nft: true,
             seller: nft_issuer(&nft),
@@ -80,8 +80,7 @@ module marketplace::marketplace {
         };
 
         table::add(&mut marketplace.nft_escrow, asset_id, nft);
-        table::add(&mut marketplace.listings, object::uid_to_inner(&listing_id), listing);
-        object::delete(listing_id);
+        table::add(&mut marketplace.listings, asset_id, listing);
     }
 
     /// List a fungible asset
@@ -91,17 +90,15 @@ module marketplace::marketplace {
         ft: RWAAssetFT,
         price: u64,
         clock: &Clock,
-        ctx: &mut TxContext
+        _ctx: &mut TxContext
     ) {
         assert!(!marketplace.paused, E_PAUSED);
         assert!(is_valid_issuer(issuer_registry, ft_issuer(&ft)), E_NOT_AUTHORIZED);
 
-        let listing_id = object::new(ctx);
         let asset_id = object::id(&ft);
         let ts = sui::clock::timestamp_ms(clock);
 
         let listing = MarketplaceListing {
-            id: object::uid_to_inner(&listing_id),
             asset_id,
             is_nft: false,
             seller: ft_issuer(&ft),
@@ -110,20 +107,20 @@ module marketplace::marketplace {
         };
 
         table::add(&mut marketplace.ft_escrow, asset_id, ft);
-        table::add(&mut marketplace.listings, object::uid_to_inner(&listing_id), listing);
-        object::delete(listing_id);
+        table::add(&mut marketplace.listings, asset_id, listing);
     }
 
     /// Buy an asset (NFT or FT)
     public entry fun buy_asset(
         marketplace: &mut Marketplace,
-        listing_id: ID,
+        asset_id: ID,
         mut payment: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         assert!(!marketplace.paused, E_PAUSED);
-        let listing = table::remove(&mut marketplace.listings, listing_id);
+        assert!(table::contains(&marketplace.listings, asset_id), E_LISTING_NOT_FOUND);
 
+        let listing = table::remove(&mut marketplace.listings, asset_id);
         assert!(coin::value(&payment) >= listing.price, E_INVALID_PAYMENT);
 
         let protocol_fee = listing.price / 1000; // 0.1%
@@ -134,10 +131,12 @@ module marketplace::marketplace {
         // TODO: Send protocol_fee to a treasury address if desired
 
         if (listing.is_nft) {
-            let nft = table::remove(&mut marketplace.nft_escrow, listing.asset_id);
+            assert!(table::contains(&marketplace.nft_escrow, asset_id), E_ASSET_NOT_FOUND);
+            let nft = table::remove(&mut marketplace.nft_escrow, asset_id);
             transfer::public_transfer(nft, tx_context::sender(ctx));
         } else {
-            let ft = table::remove(&mut marketplace.ft_escrow, listing.asset_id);
+            assert!(table::contains(&marketplace.ft_escrow, asset_id), E_ASSET_NOT_FOUND);
+            let ft = table::remove(&mut marketplace.ft_escrow, asset_id);
             transfer::public_transfer(ft, tx_context::sender(ctx));
         };
 
@@ -148,17 +147,20 @@ module marketplace::marketplace {
     /// Cancel a listing (seller only)
     public entry fun cancel_listing(
         marketplace: &mut Marketplace,
-        listing_id: ID,
+        asset_id: ID,
         ctx: &mut TxContext
     ) {
-        let listing = table::remove(&mut marketplace.listings, listing_id);
+        assert!(table::contains(&marketplace.listings, asset_id), E_LISTING_NOT_FOUND);
+        let listing = table::remove(&mut marketplace.listings, asset_id);
         assert!(tx_context::sender(ctx) == listing.seller, E_NOT_SELLER);
 
         if (listing.is_nft) {
-            let nft = table::remove(&mut marketplace.nft_escrow, listing.asset_id);
+            assert!(table::contains(&marketplace.nft_escrow, asset_id), E_ASSET_NOT_FOUND);
+            let nft = table::remove(&mut marketplace.nft_escrow, asset_id);
             transfer::public_transfer(nft, listing.seller);
         } else {
-            let ft = table::remove(&mut marketplace.ft_escrow, listing.asset_id);
+            assert!(table::contains(&marketplace.ft_escrow, asset_id), E_ASSET_NOT_FOUND);
+            let ft = table::remove(&mut marketplace.ft_escrow, asset_id);
             transfer::public_transfer(ft, listing.seller);
         };
     }
