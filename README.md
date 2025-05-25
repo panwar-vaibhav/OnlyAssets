@@ -1,4 +1,4 @@
-# OnlyAssetss: Real World Assets Tokenization Marketplace
+# OnlyAssets: Real World Assets Tokenization Marketplace
 
 OnlyAssets is a decentralized platform built on the [Sui blockchain](https://sui.io/) that enables the tokenization of real-world assets (RWAs) and facilitates their trading through a marketplace. By leveraging the security and efficiency of the Sui blockchain and the [Move programming language](https://move-language.github.io/move/), OnlyAssets provides a robust solution for asset owners to digitize their assets and for investors to access a diverse range of investment opportunities.
 
