@@ -7,7 +7,8 @@ import { BottomGradient, LabelInputContainer } from "@/components/ui/form-utils"
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 
-const PACKAGE_ID = '0x64e58ad8ab4db950c7a556ac118003e3cae885ae2e18cf92a6b1131b3e4aba69';
+const PACKAGE_ID = '0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa';
+const PACKAGE_ID_admin = '0x4834efbf750e8215714738f047a940dcb330431c61d95d5c544975ca97157d77';
 
 interface AdminDialogsProps {
   showPauseDialog: boolean;
