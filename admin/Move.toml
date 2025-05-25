@@ -1,10 +1,11 @@
 [package]
-name = "adminContract"
+name = "admin"
 edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
 [dependencies]
+issuerregistry = { local = "../issuerregistry" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -18,7 +19,8 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # Override = { local = "../conflicting/version", override = true }
 
 [addresses]
-admincontract = "0x0"
+admin = "0x4834efbf750e8215714738f047a940dcb330431c61d95d5c544975ca97157d77"
+issuerregistry = "0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
@@ -33,4 +35,3 @@ admincontract = "0x0"
 # The dev-addresses section allows overwriting named addresses for the `--test`
 # and `--dev` modes.
 # alice = "0xB0B"
-
