@@ -29,6 +29,14 @@ interface AdminDialogsProps {
   setShowCheckIssuerDialog: (v: boolean) => void;
   handlePauseMarketplace: () => void;
   handleResumeMarketplace: () => void;
+  showGetRegistryDialog: boolean;
+  setShowGetRegistryDialog: (v: boolean) => void;
+  showGetBalanceBookDialog: boolean;
+  setShowGetBalanceBookDialog: (v: boolean) => void;
+  showIsPausedDialog: boolean;
+  setShowIsPausedDialog: (v: boolean) => void;
+  showAdminAddressDialog: boolean;
+  setShowAdminAddressDialog: (v: boolean) => void;
 }
 
 const AdminDialogs: React.FC<AdminDialogsProps> = ({
@@ -50,6 +58,14 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
   setShowCheckIssuerDialog,
   handlePauseMarketplace,
   handleResumeMarketplace,
+  showGetRegistryDialog,
+  setShowGetRegistryDialog,
+  showGetBalanceBookDialog,
+  setShowGetBalanceBookDialog,
+  showIsPausedDialog,
+  setShowIsPausedDialog,
+  showAdminAddressDialog,
+  setShowAdminAddressDialog,
 }) => {
   const { mutate: signAndExecuteAddIssuer } = useSignAndExecuteTransaction();
   const { mutate: signAndExecuteDeactivate } = useSignAndExecuteTransaction();
@@ -57,6 +73,19 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
   const [digest, setDigest] = useState('');
+
+  // --- New Admin State for Dialogs ---
+  const [adminCapId, setAdminCapId] = useState("");
+  const [platformStateId, setPlatformStateId] = useState("");
+  const [pauseError, setPauseError] = useState<string | null>(null);
+  const [unpauseError, setUnpauseError] = useState<string | null>(null);
+  const [newRegistryResult, setNewRegistryResult] = useState<string | null>(null);
+  const [newBalanceBookResult, setNewBalanceBookResult] = useState<string | null>(null);
+  const [getRegistryResult, setGetRegistryResult] = useState<string | null>(null);
+  const [getBalanceBookResult, setGetBalanceBookResult] = useState<string | null>(null);
+  const [isPausedResult, setIsPausedResult] = useState<string | null>(null);
+  const [adminAddressResult, setAdminAddressResult] = useState<string | null>(null);
+  const { mutate: signAndExecuteAdmin } = useSignAndExecuteTransaction();
 
   // Add Verified Issuer
   const handleAddIssuer = (
@@ -180,6 +209,162 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
     }
   };
 
+  // --- Handlers for new admin contract functions ---
+  const handlePausePlatform = () => {
+    setPauseError(null);
+    if (!adminCapId || !platformStateId) return setPauseError("AdminCap and PlatformState IDs required");
+    if (!currentAccount) { triggerHeaderConnect(); return; }
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${PACKAGE_ID_admin}::admin::pause_platform`,
+      arguments: [tx.object(adminCapId), tx.object(platformStateId), tx.object(currentAccount.address)],
+    });
+    signAndExecuteAdmin({ transaction: tx, chain: 'sui:testnet' }, {
+      onSuccess: (result) => setDigest(result.digest),
+      onError: (err) => setPauseError(err?.message || 'Pause failed'),
+    });
+  };
+
+  const handleUnpausePlatform = () => {
+    setUnpauseError(null);
+    if (!adminCapId || !platformStateId) return setUnpauseError("AdminCap and PlatformState IDs required");
+    if (!currentAccount) { triggerHeaderConnect(); return; }
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${PACKAGE_ID_admin}::admin::unpause_platform`,
+      arguments: [tx.object(adminCapId), tx.object(platformStateId), tx.object(currentAccount.address)],
+    });
+    signAndExecuteAdmin({ transaction: tx, chain: 'sui:testnet' }, {
+      onSuccess: (result) => setDigest(result.digest),
+      onError: (err) => setUnpauseError(err?.message || 'Unpause failed'),
+    });
+  };
+
+  const handleNewRegistry = () => {
+    setNewRegistryResult(null);
+    if (!currentAccount) { triggerHeaderConnect(); return; }
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${PACKAGE_ID_admin}::admin::new_registry`,
+      arguments: [tx.object(currentAccount.address)],
+    });
+    signAndExecuteAdmin({ transaction: tx, chain: 'sui:testnet' }, {
+      onSuccess: (result) => setNewRegistryResult('New registry created! Tx: ' + result.digest),
+      onError: (err) => setNewRegistryResult('Error: ' + (err?.message || 'Failed')),
+    });
+  };
+
+  const handleNewBalanceBook = () => {
+    setNewBalanceBookResult(null);
+    if (!currentAccount) { triggerHeaderConnect(); return; }
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${PACKAGE_ID_admin}::admin::new_balance_book`,
+      arguments: [tx.object(currentAccount.address)],
+    });
+    signAndExecuteAdmin({ transaction: tx, chain: 'sui:testnet' }, {
+      onSuccess: (result) => setNewBalanceBookResult('New balance book created! Tx: ' + result.digest),
+      onError: (err) => setNewBalanceBookResult('Error: ' + (err?.message || 'Failed')),
+    });
+  };
+
+  const handleGetRegistry = async () => {
+    setGetRegistryResult(null);
+    if (!platformStateId) return setGetRegistryResult('PlatformState ID required');
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID_admin}::admin::get_registry`,
+        arguments: [tx.object(platformStateId)],
+      });
+      const result = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: currentAccount?.address || '',
+      });
+      const returnValues = (result as any)?.results?.[0]?.returnValues;
+      let registryId = '';
+      if (returnValues && returnValues.length > 0) {
+        registryId = (returnValues[0][0] as string);
+      }
+      setGetRegistryResult(registryId ? `Registry ID: ${registryId}` : 'No registry found');
+    } catch (err: any) {
+      setGetRegistryResult('Error: ' + (err?.message || 'Failed'));
+    }
+  };
+
+  const handleGetBalanceBook = async () => {
+    setGetBalanceBookResult(null);
+    if (!platformStateId) return setGetBalanceBookResult('PlatformState ID required');
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID_admin}::admin::get_balance_book`,
+        arguments: [tx.object(platformStateId)],
+      });
+      const result = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: currentAccount?.address || '',
+      });
+      const returnValues = (result as any)?.results?.[0]?.returnValues;
+      let bookId = '';
+      if (returnValues && returnValues.length > 0) {
+        bookId = (returnValues[0][0] as string);
+      }
+      setGetBalanceBookResult(bookId ? `Balance Book ID: ${bookId}` : 'No balance book found');
+    } catch (err: any) {
+      setGetBalanceBookResult('Error: ' + (err?.message || 'Failed'));
+    }
+  };
+
+  const handleIsPaused = async () => {
+    setIsPausedResult(null);
+    if (!platformStateId) return setIsPausedResult('PlatformState ID required');
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID_admin}::admin::is_paused`,
+        arguments: [tx.object(platformStateId)],
+      });
+      const result = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: currentAccount?.address || '',
+      });
+      const returnValues = (result as any)?.results?.[0]?.returnValues;
+      let isPaused = false;
+      if (returnValues && returnValues.length > 0) {
+        const bcsBytes = returnValues[0][0];
+        isPaused = bcsBytes && bcsBytes.length > 0 && bcsBytes[0] === 1;
+      }
+      setIsPausedResult(isPaused ? 'Platform is paused' : 'Platform is active');
+    } catch (err: any) {
+      setIsPausedResult('Error: ' + (err?.message || 'Failed'));
+    }
+  };
+
+  const handleAdminAddress = async () => {
+    setAdminAddressResult(null);
+    if (!adminCapId) return setAdminAddressResult('AdminCap ID required');
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID_admin}::admin::admin_address`,
+        arguments: [tx.object(adminCapId)],
+      });
+      const result = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: currentAccount?.address || '',
+      });
+      const returnValues = (result as any)?.results?.[0]?.returnValues;
+      let adminAddr = '';
+      if (returnValues && returnValues.length > 0) {
+        adminAddr = (returnValues[0][0] as string);
+      }
+      setAdminAddressResult(adminAddr ? `Admin Address: ${adminAddr}` : 'No admin address found');
+    } catch (err: any) {
+      setAdminAddressResult('Error: ' + (err?.message || 'Failed'));
+    }
+  };
+
   return (
     <>
       {/* Pause Marketplace Dialog */}
@@ -188,17 +373,24 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
           <DialogHeader>
             <DialogTitle>Pause Marketplace</DialogTitle>
             <DialogDescription>
-              Are you sure you want to pause the marketplace? This will temporarily suspend all trading activities.
+              Pause all marketplace and minting operations. Requires AdminCap and PlatformState IDs.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPauseDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handlePauseMarketplace}>
-              Pause Marketplace
-            </Button>
-          </DialogFooter>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handlePausePlatform(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="adminCapId">AdminCap Object ID</Label>
+              <Input id="adminCapId" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
+            </LabelInputContainer>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateId">PlatformState Object ID</Label>
+              <Input id="platformStateId" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            {pauseError && <div className="text-red-600 mt-2">{pauseError}</div>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPauseDialog(false)}>Cancel</Button>
+              <Button variant="destructive" type="submit">Pause Platform</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -206,86 +398,63 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
       <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Resume Marketplace</DialogTitle>
+            <DialogTitle>Unpause Marketplace</DialogTitle>
             <DialogDescription>
-              Are you sure you want to resume the marketplace? This will enable all trading activities.
+              Resume all marketplace and minting operations. Requires AdminCap and PlatformState IDs.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResumeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleResumeMarketplace}>
-              Resume Marketplace
-            </Button>
-          </DialogFooter>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleUnpausePlatform(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="adminCapId2">AdminCap Object ID</Label>
+              <Input id="adminCapId2" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
+            </LabelInputContainer>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateId2">PlatformState Object ID</Label>
+              <Input id="platformStateId2" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            {unpauseError && <div className="text-red-600 mt-2">{unpauseError}</div>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowResumeDialog(false)}>Cancel</Button>
+              <Button type="submit">Unpause Platform</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
       {/* Registry Replacement Dialog */}
       <Dialog open={showRegistryDialog} onOpenChange={setShowRegistryDialog}>
-        <DialogContent className="sm:max-w-lg shadow-input bg-white dark:bg-black p-4 md:p-8">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-neutral-800 dark:text-neutral-200">Replace Registry</DialogTitle>
-            <DialogDescription className="mt-2 max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-              Enter the required object IDs to replace the current registry.
+            <DialogTitle>New Issuer Registry</DialogTitle>
+            <DialogDescription>
+              Create a new Issuer Registry. No input required.
             </DialogDescription>
           </DialogHeader>
-          <form className="my-8" onSubmit={e => e.preventDefault()}>
-            <div className="space-y-4">
-              <LabelInputContainer>
-                <Label htmlFor="platformStateId">PlatformState Object ID</Label>
-                <Input id="platformStateId" placeholder="Enter PlatformState Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="adminCapId">AdminCap Object ID</Label>
-                <Input id="adminCapId" placeholder="Enter AdminCap Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="newRegistryId">New Issuer Registry Object ID</Label>
-                <Input id="newRegistryId" placeholder="Enter New Issuer Registry Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <div className="mt-8">
-                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]">
-                  Replace Registry →
-                  <BottomGradient />
-                </button>
-              </div>
-            </div>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleNewRegistry(); }}>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRegistryDialog(false)}>Cancel</Button>
+              <Button type="submit">Create Registry</Button>
+            </DialogFooter>
+            {newRegistryResult && <div className="text-green-600 mt-2">{newRegistryResult}</div>}
           </form>
         </DialogContent>
       </Dialog>
 
       {/* Balance Book Replacement Dialog */}
       <Dialog open={showBalanceBookDialog} onOpenChange={setShowBalanceBookDialog}>
-        <DialogContent className="sm:max-w-lg shadow-input bg-white dark:bg-black p-4 md:p-8">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-neutral-800 dark:text-neutral-200">Replace Balance Book</DialogTitle>
-            <DialogDescription className="mt-2 max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-              Enter the required object IDs to replace the current balance book.
+            <DialogTitle>New Balance Book</DialogTitle>
+            <DialogDescription>
+              Create a new Balance Book. No input required.
             </DialogDescription>
           </DialogHeader>
-          <form className="my-8" onSubmit={e => e.preventDefault()}>
-            <div className="space-y-4">
-              <LabelInputContainer>
-                <Label htmlFor="platformStateId2">PlatformState Object ID</Label>
-                <Input id="platformStateId2" placeholder="Enter PlatformState Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="adminCapId2">AdminCap Object ID</Label>
-                <Input id="adminCapId2" placeholder="Enter AdminCap Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="newBalanceBookId">New Balance Book Object ID</Label>
-                <Input id="newBalanceBookId" placeholder="Enter New Balance Book Object ID" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <div className="mt-8">
-                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]">
-                  Replace Balance Book →
-                  <BottomGradient />
-                </button>
-              </div>
-            </div>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleNewBalanceBook(); }}>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBalanceBookDialog(false)}>Cancel</Button>
+              <Button type="submit">Create Balance Book</Button>
+            </DialogFooter>
+            {newBalanceBookResult && <div className="text-green-600 mt-2">{newBalanceBookResult}</div>}
           </form>
         </DialogContent>
       </Dialog>
@@ -461,6 +630,187 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
                 <div className="mt-4 text-red-600 dark:text-red-400 font-semibold">{checkIssuerError}</div>
               )}
             </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- New Admin Dialogs --- */}
+      {/* Pause Platform Dialog */}
+      <Dialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pause Platform</DialogTitle>
+            <DialogDescription>
+              Pause all marketplace and minting operations. Requires AdminCap and PlatformState IDs.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handlePausePlatform(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="adminCapId">AdminCap Object ID</Label>
+              <Input id="adminCapId" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
+            </LabelInputContainer>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateId">PlatformState Object ID</Label>
+              <Input id="platformStateId" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            {pauseError && <div className="text-red-600 mt-2">{pauseError}</div>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPauseDialog(false)}>Cancel</Button>
+              <Button variant="destructive" type="submit">Pause Platform</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unpause Platform Dialog */}
+      <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Unpause Platform</DialogTitle>
+            <DialogDescription>
+              Resume all marketplace and minting operations. Requires AdminCap and PlatformState IDs.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleUnpausePlatform(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="adminCapId2">AdminCap Object ID</Label>
+              <Input id="adminCapId2" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
+            </LabelInputContainer>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateId2">PlatformState Object ID</Label>
+              <Input id="platformStateId2" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            {unpauseError && <div className="text-red-600 mt-2">{unpauseError}</div>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowResumeDialog(false)}>Cancel</Button>
+              <Button type="submit">Unpause Platform</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Registry Dialog */}
+      <Dialog open={showRegistryDialog} onOpenChange={setShowRegistryDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Issuer Registry</DialogTitle>
+            <DialogDescription>
+              Create a new Issuer Registry. No input required.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleNewRegistry(); }}>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRegistryDialog(false)}>Cancel</Button>
+              <Button type="submit">Create Registry</Button>
+            </DialogFooter>
+            {newRegistryResult && <div className="text-green-600 mt-2">{newRegistryResult}</div>}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Balance Book Dialog */}
+      <Dialog open={showBalanceBookDialog} onOpenChange={setShowBalanceBookDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Balance Book</DialogTitle>
+            <DialogDescription>
+              Create a new Balance Book. No input required.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleNewBalanceBook(); }}>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBalanceBookDialog(false)}>Cancel</Button>
+              <Button type="submit">Create Balance Book</Button>
+            </DialogFooter>
+            {newBalanceBookResult && <div className="text-green-600 mt-2">{newBalanceBookResult}</div>}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Get Registry Dialog */}
+      <Dialog open={showGetRegistryDialog} onOpenChange={setShowGetRegistryDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Get Registry</DialogTitle>
+            <DialogDescription>
+              Get the current Issuer Registry from PlatformState.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleGetRegistry(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateIdGetReg">PlatformState Object ID</Label>
+              <Input id="platformStateIdGetReg" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            <DialogFooter>
+              <Button type="submit">Get Registry</Button>
+            </DialogFooter>
+            {getRegistryResult && <div className="text-blue-600 mt-2">{getRegistryResult}</div>}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Get Balance Book Dialog */}
+      <Dialog open={showGetBalanceBookDialog} onOpenChange={setShowGetBalanceBookDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Get Balance Book</DialogTitle>
+            <DialogDescription>
+              Get the current Balance Book from PlatformState.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleGetBalanceBook(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateIdGetBook">PlatformState Object ID</Label>
+              <Input id="platformStateIdGetBook" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            <DialogFooter>
+              <Button type="submit">Get Balance Book</Button>
+            </DialogFooter>
+            {getBalanceBookResult && <div className="text-blue-600 mt-2">{getBalanceBookResult}</div>}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Is Paused Dialog */}
+      <Dialog open={showIsPausedDialog} onOpenChange={setShowIsPausedDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Check Platform Paused</DialogTitle>
+            <DialogDescription>
+              Check if the platform is currently paused.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleIsPaused(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="platformStateIdPaused">PlatformState Object ID</Label>
+              <Input id="platformStateIdPaused" value={platformStateId} onChange={e => setPlatformStateId(e.target.value)} placeholder="Enter PlatformState Object ID" type="text" />
+            </LabelInputContainer>
+            <DialogFooter>
+              <Button type="submit">Check Paused</Button>
+            </DialogFooter>
+            {isPausedResult && <div className="text-blue-600 mt-2">{isPausedResult}</div>}
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Address Dialog */}
+      <Dialog open={showAdminAddressDialog} onOpenChange={setShowAdminAddressDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Get Admin Address</DialogTitle>
+            <DialogDescription>
+              Get the admin address from AdminCap.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handleAdminAddress(); }}>
+            <LabelInputContainer>
+              <Label htmlFor="adminCapIdAddr">AdminCap Object ID</Label>
+              <Input id="adminCapIdAddr" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
+            </LabelInputContainer>
+            <DialogFooter>
+              <Button type="submit">Get Admin Address</Button>
+            </DialogFooter>
+            {adminAddressResult && <div className="text-blue-600 mt-2">{adminAddressResult}</div>}
           </form>
         </DialogContent>
       </Dialog>

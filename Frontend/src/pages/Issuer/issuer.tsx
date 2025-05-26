@@ -3,12 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BottomGradient, LabelInputContainer } from '@/components/ui/form-utils';
+import { LabelInputContainer } from '@/components/ui/form-utils';
 import { BackgroundLines } from "@/components/ui/background-lines";
 import { FloatingNav } from "@/components/ui/floating-navbar";
 import { IconHome, IconMessage, IconUser } from "@tabler/icons-react";
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
+import { Link } from 'react-router-dom';
 
 const assetTypes = [
   'Real Estate',
@@ -17,6 +18,7 @@ const assetTypes = [
 ];
 
 const RWA_ASSET_PACKAGE_ID = '0xf62c99a340ecd1ae3faf18133f007ee1a391335202291394d3fab96957ca6d1c';
+const MARKETPLACE_PACKAGE_ID = '0xf3523d1917b7e6bbae4b8ccfdfcf091f6759eb2a29b5a01480f029fca16e7dbf';
 
 const navItems = [
   {
@@ -30,8 +32,8 @@ const navItems = [
     icon: <IconUser className="h-4 w-4 text-neutral-500 dark:text-white" />,
   },
   {
-    name: "Contact",
-    link: "#contact",
+    name: "Tokenize your asset",
+    link: "/issuer",
     icon: <IconMessage className="h-4 w-4 text-neutral-500 dark:text-white" />,
   },
 ];
@@ -39,6 +41,7 @@ const navItems = [
 const Issuer: React.FC = () => {
   const [showNFTDialog, setShowNFTDialog] = useState(false);
   const [showFTDialog, setShowFTDialog] = useState(false);
+  const [showListDialog, setShowListDialog] = useState(false);
 
   // NFT form state
   const [nftCap, setNftCap] = useState('');
@@ -58,10 +61,19 @@ const Issuer: React.FC = () => {
   const [ftTotalSupply, setFtTotalSupply] = useState('');
   const [ftRegistry, setFtRegistry] = useState('');
 
+  // List Asset form state
+  const [listType, setListType] = useState<'nft' | 'ft'>('nft');
+  const [listMarketplace, setListMarketplace] = useState('');
+  const [listRegistry, setListRegistry] = useState('');
+  const [listAssetId, setListAssetId] = useState('');
+  const [listPrice, setListPrice] = useState('');
+  const [listClock, setListClock] = useState('');
+
   const currentAccount = useCurrentAccount();
   const { mutate: signAndExecuteMintNFT } = useSignAndExecuteTransaction();
   const { mutate: signAndExecuteMintFT } = useSignAndExecuteTransaction();
   const { mutate: connectWallet } = useConnectWallet();
+  const { mutate: signAndExecuteList } = useSignAndExecuteTransaction();
   const wallets = useWallets();
   const [showWallets, setShowWallets] = useState(false);
   const [pendingMint, setPendingMint] = useState<'nft' | 'ft' | null>(null);
@@ -132,6 +144,40 @@ const Issuer: React.FC = () => {
     });
   };
 
+  // Handler for listing asset
+  const handleListAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!listMarketplace || !listRegistry || !listAssetId || !listPrice || !listClock) return;
+    const tx = new Transaction();
+    if (listType === 'nft') {
+      tx.moveCall({
+        target: `${MARKETPLACE_PACKAGE_ID}::marketplace::list_asset_nft`,
+        arguments: [
+          tx.object(listMarketplace),
+          tx.object(listRegistry),
+          tx.object(listAssetId),
+          tx.pure.u64(listPrice),
+          tx.object(listClock),
+        ],
+      });
+    } else {
+      tx.moveCall({
+        target: `${MARKETPLACE_PACKAGE_ID}::marketplace::list_asset_ft`,
+        arguments: [
+          tx.object(listMarketplace),
+          tx.object(listRegistry),
+          tx.object(listAssetId),
+          tx.pure.u64(listPrice),
+          tx.object(listClock),
+        ],
+      });
+    }
+    signAndExecuteList({ transaction: tx, chain: 'sui:testnet' });
+    setShowListDialog(false);
+  };
+
+  const { mutate: signAndExecuteMint } = useSignAndExecuteTransaction();
+
   // Wallet selection dialog
   const WalletSelectDialog = () => (
     <Dialog open={showWallets} onOpenChange={setShowWallets}>
@@ -171,43 +217,65 @@ const Issuer: React.FC = () => {
     </Dialog>
   );
 
+  if (!currentAccount) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black">
+        <ConnectButton className="mb-6" />
+        <div className="text-lg text-white/80 font-semibold mt-4">Please connect your wallet</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black">
-      {/* Always render header nav at top, outside BackgroundLines */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-sm w-full">
+      {/* Header: match About page, always visible on refresh */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-sm">
         <div className="container mx-auto">
           <FloatingNav navItems={navItems} />
         </div>
-      </header>
+      </nav>
       <main className="w-full">
-        <BackgroundLines className="flex items-center justify-center w-full flex-col px-4 min-h-screen pt-24">
+        <BackgroundLines className="flex items-center justify-center w-full flex-col px-4 min-h-screen pt-32">
           <div className="relative z-10 w-full flex flex-col items-center">
-            <h2 className="bg-clip-text text-transparent text-center bg-gradient-to-b from-neutral-900 to-neutral-700 dark:from-neutral-600 dark:to-white text-2xl md:text-4xl lg:text-7xl font-sans py-2 md:py-10 font-bold tracking-tight">
-              Welcome to{" "}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-violet-500 to-pink-500">
-                Issuer Dashboard
-              </span>
-            </h2>
-            <p className="max-w-xl mx-auto text-sm md:text-lg text-neutral-700 dark:text-neutral-400 text-center">
-              Manage and issue your RWA tokens, track performance, and handle distributions.
-            </p>
-            <div className="flex flex-col md:flex-row gap-6 mb-12">
-              <Button className="px-8 py-3 text-lg font-semibold bg-marketplace-blue text-white rounded-lg shadow hover:bg-marketplace-blue/90" onClick={() => setShowNFTDialog(true)}>
-                Mint Non fungible Asset
-              </Button>
-              <Button className="px-8 py-3 text-lg font-semibold bg-marketplace-blue text-white rounded-lg shadow hover:bg-marketplace-blue/90" onClick={() => setShowFTDialog(true)}>
-                Mint Fungible Asset
-              </Button>
+            {/* Move Welcome text to top */}
+            <div className="w-full max-w-3xl rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/80 dark:bg-black/80 shadow-xl p-8 mb-12">
+              <h2 className="bg-clip-text text-transparent text-center bg-gradient-to-b from-neutral-900 to-neutral-700 dark:from-neutral-600 dark:to-white text-2xl md:text-4xl lg:text-7xl font-sans py-2 font-bold tracking-tight mb-8">
+                Welcome to{" "}
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 via-violet-500 to-pink-500">
+                  Issuer Dashboard
+                </span>
+              </h2>
+              <p className="max-w-xl mx-auto text-sm md:text-lg text-neutral-700 dark:text-neutral-400 text-center mb-8">
+                Manage and issue your RWA tokens, track performance, and handle distributions.
+              </p>
+              {/* Mint buttons vertical, styled like admin dashboard */}
+              <div className="flex flex-col md:flex-row gap-8 w-full max-w-2xl mx-auto mb-4 justify-center">
+                <div className="flex flex-col gap-4 w-full max-w-xs">
+                  <Button className="h-12 w-full text-lg font-semibold bg-marketplace-blue text-white rounded-lg shadow hover:bg-marketplace-blue/90 transition-all" onClick={() => setShowNFTDialog(true)}>
+                    Mint Non fungible Asset
+                  </Button>
+                  <Button className="h-12 w-full text-lg font-semibold bg-marketplace-blue text-white rounded-lg shadow hover:bg-marketplace-blue/90 transition-all" onClick={() => setShowFTDialog(true)}>
+                    Mint Fungible Asset
+                  </Button>
+                </div>
+                {/* List Asset Section */}
+                <div className="flex flex-col items-center justify-center w-full max-w-xs">
+                  <div className="text-center text-base font-semibold text-neutral-800 dark:text-neutral-200 mb-2">Already minted your asset?</div>
+                  <Button className="h-12 w-full text-lg font-semibold bg-marketplace-blue text-white rounded-lg shadow hover:bg-marketplace-blue/90 transition-all" onClick={() => setShowListDialog(true)}>
+                    List Asset to Market
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* NFT Mint Dialog */}
             <Dialog open={showNFTDialog} onOpenChange={setShowNFTDialog}>
-              <DialogContent className="sm:max-w-lg shadow-input bg-white dark:bg-black p-4 md:p-8">
+              <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Mint Real-World Asset NFT</DialogTitle>
-                  <DialogDescription>Fill in the details to mint a new RWA NFT.</DialogDescription>
+                  <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Mint Real-World Asset NFT</DialogTitle>
+                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">Fill in the details to mint a new RWA NFT.</DialogDescription>
                 </DialogHeader>
-                <form className="my-6 space-y-4" onSubmit={handleMintNFT}>
+                <form className="my-6 space-y-5" onSubmit={handleMintNFT}>
                   <LabelInputContainer>
                     <Label htmlFor="nftCap">IssuerCap Object ID</Label>
                     <Input id="nftCap" value={nftCap} onChange={e => setNftCap(e.target.value)} placeholder="Enter IssuerCap Object ID" type="text" className="shadow-input font-mono text-sm" />
@@ -253,8 +321,8 @@ const Issuer: React.FC = () => {
                     <Input id="nftRegistry" value={nftRegistry} onChange={e => setNftRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
                   </LabelInputContainer>
                   <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setShowNFTDialog(false)}>Cancel</Button>
-                    <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90">Mint NFT</Button>
+                    <Button type="button" variant="outline" onClick={() => setShowNFTDialog(false)} className="rounded-md">Cancel</Button>
+                    <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Mint NFT</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -262,12 +330,12 @@ const Issuer: React.FC = () => {
 
             {/* FT Mint Dialog */}
             <Dialog open={showFTDialog} onOpenChange={setShowFTDialog}>
-              <DialogContent className="sm:max-w-lg shadow-input bg-white dark:bg-black p-4 md:p-8">
+              <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Mint Real-World Asset Fungible Token</DialogTitle>
-                  <DialogDescription>Fill in the details to mint a new RWA Fungible Token.</DialogDescription>
+                  <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Mint Real-World Asset Fungible Token</DialogTitle>
+                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">Fill in the details to mint a new RWA Fungible Token.</DialogDescription>
                 </DialogHeader>
-                <form className="my-6 space-y-4" onSubmit={handleMintFT}>
+                <form className="my-6 space-y-5" onSubmit={handleMintFT}>
                   <LabelInputContainer>
                     <Label htmlFor="ftCap">IssuerCap Object ID</Label>
                     <Input id="ftCap" value={ftCap} onChange={e => setFtCap(e.target.value)} placeholder="Enter IssuerCap Object ID" type="text" className="shadow-input font-mono text-sm" />
@@ -293,8 +361,51 @@ const Issuer: React.FC = () => {
                     <Input id="ftRegistry" value={ftRegistry} onChange={e => setFtRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
                   </LabelInputContainer>
                   <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setShowFTDialog(false)}>Cancel</Button>
-                    <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90">Mint FT</Button>
+                    <Button type="button" variant="outline" onClick={() => setShowFTDialog(false)} className="rounded-md">Cancel</Button>
+                    <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Mint FT</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* List Asset Dialog */}
+            <Dialog open={showListDialog} onOpenChange={setShowListDialog}>
+              <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">List Asset to Marketplace</DialogTitle>
+                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">Fill in the details to list your asset (NFT or FT) on the marketplace.</DialogDescription>
+                </DialogHeader>
+                <form className="my-6 space-y-5" onSubmit={handleListAsset}>
+                  <LabelInputContainer>
+                    <Label htmlFor="listType">Asset Type</Label>
+                    <select id="listType" value={listType} onChange={e => setListType(e.target.value as 'nft' | 'ft')} className="shadow-input rounded-md px-3 py-2">
+                      <option value="nft">NFT</option>
+                      <option value="ft">Fungible Token</option>
+                    </select>
+                  </LabelInputContainer>
+                  <LabelInputContainer>
+                    <Label htmlFor="listMarketplace">Marketplace Object ID</Label>
+                    <Input id="listMarketplace" value={listMarketplace} onChange={e => setListMarketplace(e.target.value)} placeholder="Enter Marketplace Object ID" type="text" className="shadow-input font-mono text-sm" />
+                  </LabelInputContainer>
+                  <LabelInputContainer>
+                    <Label htmlFor="listRegistry">IssuerRegistry Object ID</Label>
+                    <Input id="listRegistry" value={listRegistry} onChange={e => setListRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
+                  </LabelInputContainer>
+                  <LabelInputContainer>
+                    <Label htmlFor="listAssetId">Asset Object ID</Label>
+                    <Input id="listAssetId" value={listAssetId} onChange={e => setListAssetId(e.target.value)} placeholder="Enter Asset NFT/FT Object ID" type="text" className="shadow-input font-mono text-sm" />
+                  </LabelInputContainer>
+                  <LabelInputContainer>
+                    <Label htmlFor="listPrice">Price (u64)</Label>
+                    <Input id="listPrice" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Enter listing price" type="number" className="shadow-input" />
+                  </LabelInputContainer>
+                  <LabelInputContainer>
+                    <Label htmlFor="listClock">Clock Object ID</Label>
+                    <Input id="listClock" value={listClock} onChange={e => setListClock(e.target.value)} placeholder="Enter Clock Object ID" type="text" className="shadow-input font-mono text-sm" />
+                  </LabelInputContainer>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setShowListDialog(false)} className="rounded-md">Cancel</Button>
+                    <Button type="submit" className="bg-green-600 text-white hover:bg-green-700 rounded-md">List Asset</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>

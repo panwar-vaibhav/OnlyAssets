@@ -1,6 +1,7 @@
 import React from 'react';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
+// import HeroMain from '@/components/hero-main';
 import AboutRwa from '@/components/AboutRwa';
 import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import Features from '@/components/Features';
@@ -9,12 +10,14 @@ import TextCarousel from '@/components/textCarousel';
 import TabsSection from '@/components/TabsSection';
 import Footer from '@/components/Footer';
 
+
 const Index: React.FC = () => {  return (
     <>
     <SmoothCursor />
     <div className="min-h-screen flex flex-col">
       <Header/>
       <main className="flex-1">
+        {/* <HeroMain /> */}
         <Hero />
         <Features />
         <Assets />

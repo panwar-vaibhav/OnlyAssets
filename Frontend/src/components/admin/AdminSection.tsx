@@ -4,6 +4,7 @@ import AdminHeader from "./AdminHeader";
 import AdminTools from "./AdminTools";
 import IssuerManagement from "./IssuerManagement";
 import AdminDialogs from "./AdminDialogs";
+import { useCurrentAccount, ConnectButton } from '@mysten/dapp-kit';
 
 const AdminSection = () => {
   // State declarations
@@ -16,6 +17,11 @@ const AdminSection = () => {
   const [showDeactivateIssuerDialog, setShowDeactivateIssuerDialog] = useState(false);
   const [showIssueCapsDialog, setShowIssueCapsDialog] = useState(false);
   const [showCheckIssuerDialog, setShowCheckIssuerDialog] = useState(false);
+  const [showGetRegistryDialog, setShowGetRegistryDialog] = useState(false);
+  const [showGetBalanceBookDialog, setShowGetBalanceBookDialog] = useState(false);
+  const [showIsPausedDialog, setShowIsPausedDialog] = useState(false);
+  const [showAdminAddressDialog, setShowAdminAddressDialog] = useState(false);
+  const currentAccount = useCurrentAccount();
 
   const handlePauseMarketplace = () => {
     setIsMarketplacePaused(true);
@@ -27,6 +33,15 @@ const AdminSection = () => {
     setShowResumeDialog(false);
   };
 
+  if (!currentAccount) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black">
+        <ConnectButton className="mb-6" />
+        <div className="text-lg text-white/80 font-semibold mt-4">Please connect using admin wallet</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <BackgroundBeamsWithCollision className="min-h-screen">
@@ -34,8 +49,14 @@ const AdminSection = () => {
           <AdminHeader onPause={() => setShowPauseDialog(true)} onResume={() => setShowResumeDialog(true)} />
           <div className="max-w-7xl mx-auto px-4 py-8">
             <AdminTools
+              onShowPauseDialog={() => setShowPauseDialog(true)}
+              onShowResumeDialog={() => setShowResumeDialog(true)}
               onShowRegistryDialog={() => setShowRegistryDialog(true)}
               onShowBalanceBookDialog={() => setShowBalanceBookDialog(true)}
+              onShowGetRegistryDialog={() => setShowGetRegistryDialog(true)}
+              onShowGetBalanceBookDialog={() => setShowGetBalanceBookDialog(true)}
+              onShowIsPausedDialog={() => setShowIsPausedDialog(true)}
+              onShowAdminAddressDialog={() => setShowAdminAddressDialog(true)}
             />
             <IssuerManagement
               onShowAddIssuerDialog={() => setShowAddIssuerDialog(true)}
@@ -63,6 +84,14 @@ const AdminSection = () => {
             setShowCheckIssuerDialog={setShowCheckIssuerDialog}
             handlePauseMarketplace={handlePauseMarketplace}
             handleResumeMarketplace={handleResumeMarketplace}
+            showGetRegistryDialog={showGetRegistryDialog}
+            setShowGetRegistryDialog={setShowGetRegistryDialog}
+            showGetBalanceBookDialog={showGetBalanceBookDialog}
+            setShowGetBalanceBookDialog={setShowGetBalanceBookDialog}
+            showIsPausedDialog={showIsPausedDialog}
+            setShowIsPausedDialog={setShowIsPausedDialog}
+            showAdminAddressDialog={showAdminAddressDialog}
+            setShowAdminAddressDialog={setShowAdminAddressDialog}
           />
         </div>
       </BackgroundBeamsWithCollision>
