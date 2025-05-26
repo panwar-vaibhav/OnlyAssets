@@ -121,4 +121,14 @@ module rwaasset::rwaasset {
         };
         sui::transfer::transfer(ft, issuer(cap));
     }
+
+    // === Public Getter Functions ===
+
+    public fun nft_issuer(nft: &RWAAssetNFT): address {
+        nft.issuer
+    }
+
+    public fun ft_issuer(ft: &RWAAssetFT): address {
+        ft.issuer
+    }
 }

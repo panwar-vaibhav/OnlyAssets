@@ -19,7 +19,7 @@ edition = "2024.beta"   # edition = "legacy" to use legacy (pre-2024) Move
 
 [addresses]
 #issuerregistry = "0x0"
-issuerregistry = "0x0"
+issuerregistry = "0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.

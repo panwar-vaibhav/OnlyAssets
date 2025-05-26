@@ -18,8 +18,9 @@ issuerregistry = { local = "../issuerregistry" }
 # Override = { local = "../conflicting/version", override = true }
 
 [addresses]
-rwaasset = "0x0"
-issuerregistry = "0x64e58ad8ab4db950c7a556ac118003e3cae885ae2e18cf92a6b1131b3e4aba69"
+#rwaasset = "0x0"
+rwaasset = "0xf62c99a340ecd1ae3faf18133f007ee1a391335202291394d3fab96957ca6d1c"
+issuerregistry = "0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa"
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
 # alice = "0xA11CE"
