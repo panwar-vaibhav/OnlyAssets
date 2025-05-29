@@ -4,20 +4,22 @@ export interface NetworkInfo {
 }
 
 export interface ListingItem {
-  id: string;
-  title: string;
-  assetNumber?: string;
-  price: number;  description: string;
-  imageUrl: string;
-  category: string;
-  network: NetworkInfo;
-  type: string;
-  tier: string;
-  earnXP: number;
-  yield: number;
-  tokenSymbol?: string; // Deprecated: use priceToken instead
+  id: string; // asset_id
+  title: string; // from NFT/FT metadata
+  description: string; // from NFT/FT metadata
+  imageUrl: string; // from NFT/FT metadata (or a default if not present)
+  price: number;
   priceToken: string;
-  
+  category: string; // "Real Estate" | "Invoices" | "Commodities"
+  network: { name: string; logo: string };
+  type: string; // "NFT" or "FT"
+  tier?: string;
+  earnXP?: number;
+  assetNumber?: string; // <-- Add this line
+  yield?: number;
+  tokenSymbol?: string;
+  assetTypeIndex?: number; // 0: RealEstate, 1: Invoice, 2: Gold/Commodity
+  metadataUri?: string;
 }
 
 export interface MarketData {

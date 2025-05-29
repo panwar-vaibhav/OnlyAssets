@@ -52,7 +52,8 @@ export const marketData: MarketData = {
       tier: 'Standard',
       earnXP: 25000,
       yield: 9.2,
-    }
+    },
+   
   ],
   invoices: [
     {
@@ -72,40 +73,7 @@ export const marketData: MarketData = {
       earnXP: 45000,
       yield: 12,
     },
-    {
-      id: '5',
-      title: 'Healthcare Bundle',
-      price: 250000,
-      description: 'Diversified healthcare sector receivables from top-tier hospitals.',
-      imageUrl: 'https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=800&auto=format&fit=crop&q=60',
-      priceToken: 'USDC',
-      category: 'Invoices',
-      network: {
-        name: 'Polygon',
-        logo: '/images/polygon-logo.svg'
-      },
-      type: 'Asset NFT (ERC721)',
-      tier: 'Standard',
-      earnXP: 35000,
-      yield: 11.5,
-    },
-    {
-      id: '6',
-      title: 'Retail Chain AR',
-      price: 150000,
-      description: 'Account receivables from national retail chain with AAA credit rating.',
-      imageUrl: 'https://images.unsplash.com/photo-1578574577315-3fbeb0cecdc2?w=800&auto=format&fit=crop&q=60',
-      priceToken: 'USDC',
-      category: 'Invoices',
-      network: {
-        name: 'Polygon',
-        logo: '/images/polygon-logo.svg'
-      },
-      type: 'Asset NFT (ERC721)',
-      tier: 'Standard',
-      earnXP: 30000,
-      yield: 10.8,
-    }
+    
   ],
   commodities: [
     {
@@ -142,22 +110,6 @@ export const marketData: MarketData = {
       earnXP: 35000,
       yield: 9.5,
     },
-    {
-      id: '9',
-      title: 'Agricultural Land',
-      price: 180000,
-      description: 'Prime agricultural land with long-term lease to organic farming cooperative.',
-      imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&auto=format&fit=crop&q=60',
-      priceToken: 'USDC',
-      category: 'Commodities',
-      network: {
-        name: 'Ethereum',
-        logo: '/images/ethereum-logo.svg'
-      },
-      type: 'Asset NFT (ERC721)',
-      tier: 'Standard',
-      earnXP: 32000,
-      yield: 8.8,
-    }
+    
   ],
 };

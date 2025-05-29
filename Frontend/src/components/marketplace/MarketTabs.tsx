@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fetchMarketplaceListings } from './fetchListings';
 import MarketplaceListing from './MarketplaceListing';
-import { MarketData } from './types';
+import { MarketData, ListingItem } from './types';
 import { useNavigate } from 'react-router-dom';
 import WormholeModal from './wormhole';
+import { ConnectButton, useConnectWallet, useWallets } from '@mysten/dapp-kit'; // <-- Add this
 
 interface MarketTabsProps {
   marketData: MarketData;
@@ -11,10 +13,19 @@ interface MarketTabsProps {
 
 const MarketTabs: React.FC<MarketTabsProps> = ({ marketData }) => {
   const [wormholeOpen, setWormholeOpen] = useState(false);
+  const [items, setItems] = useState<ListingItem[]>([]);
   const navigate = useNavigate();
 
+  // Wallet connect logic
+  const wallets = useWallets();
+  const { mutate: connect } = useConnectWallet();
+
+  useEffect(() => {
+    fetchMarketplaceListings().then(setItems);
+  }, []);
+
   return (
-    <div className="relative w-full">
+    <div className="relative w-full pt-24">
       {/* Home button top left */}
       <button
         className="absolute top-0 left-0 m-4 px-4 py-2 rounded-lg bg-white/80 hover:bg-marketplace-blue text-marketplace-blue hover:text-white font-semibold shadow transition-all z-20"
@@ -22,9 +33,9 @@ const MarketTabs: React.FC<MarketTabsProps> = ({ marketData }) => {
       >
         Home
       </button>
-      {/* Swap tokens info and button top right */}
-      <div className="absolute top-0 right-0 flex flex-col items-end m-4 z-20">
-        <span className="mb-1 text-xs text-gray-500 font-medium">have funds on another chain?</span>
+      {/* Top right controls */}
+      <div className="absolute top-0 right-0 flex flex-row items-center m-4 z-20 gap-3">
+        <ConnectButton />
         <button
           className="px-4 py-2 rounded-lg bg-marketplace-blue text-white font-semibold shadow hover:bg-marketplace-blue/90 transition-all"
           onClick={() => setWormholeOpen(true)}
@@ -34,6 +45,7 @@ const MarketTabs: React.FC<MarketTabsProps> = ({ marketData }) => {
       </div>
       <WormholeModal open={wormholeOpen} onClose={() => setWormholeOpen(false)} />
 
+      {/* Add pt-24 above so tabs are pushed below the buttons */}
       <Tabs defaultValue="realEstate" className="w-full rounded-xl p-4">
         <TabsList className="max-w-2xl mx-auto grid grid-cols-3 gap-3 h-16 p-0 mb-8 bg-gray-50/50 rounded-lg">
           <TabsTrigger 

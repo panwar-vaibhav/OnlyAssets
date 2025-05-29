@@ -9,6 +9,7 @@ import { Transaction } from '@mysten/sui/transactions';
 
 const PACKAGE_ID = '0x229c1e2dbe5490188769620bdd3abfd5b593491d97d93ed16d49d505039dc1aa';
 const PACKAGE_ID_admin = '0x4834efbf750e8215714738f047a940dcb330431c61d95d5c544975ca97157d77';
+const ISSUER_REGISTRY_OBJECT_ID = '0x8c6a1311f5fde8f391320478aa2cb25bafce1fa3a371cd3a6417d8f2d7115ee0';
 
 interface AdminDialogsProps {
   showPauseDialog: boolean;
@@ -89,19 +90,22 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
 
   // Add Verified Issuer
   const handleAddIssuer = (
-    issuerRegistryId: string,
     issuerAddress: string,
     issuerName: string,
     metadataUri: string
   ) => {
+    if (!currentAccount) {
+      triggerHeaderConnect();
+      return;
+    }
     const tx = new Transaction();
     tx.moveCall({
       target: `${PACKAGE_ID}::issuer_registry::add_issuer`,
       arguments: [
-        tx.object(issuerRegistryId),
+        tx.object(ISSUER_REGISTRY_OBJECT_ID),
         tx.pure.address(issuerAddress),
         tx.pure.vector('u8', new TextEncoder().encode(issuerName)),
-        tx.pure.vector('u8', new TextEncoder().encode(metadataUri) ),
+        tx.pure.vector('u8', new TextEncoder().encode(metadataUri)),
       ],
     });
     signAndExecuteAddIssuer({ transaction: tx, chain: 'sui:testnet' }, {
@@ -111,14 +115,13 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
 
   // Deactivate Issuer
   const handleDeactivateIssuer = (
-    deactivateRegistryId: string,
     deactivateAddress: string
   ) => {
     const tx = new Transaction();
     tx.moveCall({
       target: `${PACKAGE_ID}::issuer_registry::deactivate_issuer`,
       arguments: [
-        tx.object(deactivateRegistryId),
+        tx.object(ISSUER_REGISTRY_OBJECT_ID),
         tx.pure.address(deactivateAddress),
       ],
     });
@@ -129,14 +132,13 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
 
   // Issue IssuerCap
   const handleIssueCap = (
-    capRegistryId: string,
     capIssuerAddress: string
   ) => {
     const tx = new Transaction();
     tx.moveCall({
       target: `${PACKAGE_ID}::issuer_registry::issue_cap`,
       arguments: [
-        tx.object(capRegistryId),
+        tx.object(ISSUER_REGISTRY_OBJECT_ID),
         tx.pure.address(capIssuerAddress)
       ],
     });
@@ -150,17 +152,16 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
   const [checkIssuerLoading, setCheckIssuerLoading] = useState(false);
   const [checkIssuerError, setCheckIssuerError] = useState<string | null>(null);
 
-  const handleCheckIssuer = async (checkRegistryId: string, checkIssuerAddress: string) => {
+  const handleCheckIssuer = async (checkIssuerAddress: string) => {
     setCheckIssuerLoading(true);
     setCheckIssuerResult(null);
     setCheckIssuerError(null);
     try {
-      // Use devInspectTransactionBlock with a Transaction for read-only Move view
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::issuer_registry::is_valid_issuer`,
         arguments: [
-          tx.object(checkRegistryId),
+          tx.object(ISSUER_REGISTRY_OBJECT_ID),
           tx.pure.address(checkIssuerAddress),
         ],
       });
@@ -197,6 +198,9 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
   // Issue Cap Dialog
   const [capIssuerAddress, setCapIssuerAddress] = useState("");
   const [capRegistryId, setCapRegistryId] = useState("");
+
+  // Check Issuer Status Dialog
+  const [checkIssuerAddress, setCheckIssuerAddress] = useState(""); // <-- Add this line
 
   // Helper to trigger the ConnectButton in the header
   const triggerHeaderConnect = () => {
@@ -376,7 +380,7 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
               Pause all marketplace and minting operations. Requires AdminCap and PlatformState IDs.
             </DialogDescription>
           </DialogHeader>
-          <form className="my-8" onSubmit={e => { e.preventDefault(); handlePausePlatform(); }}>
+          <form className="my-8" onSubmit={e => { e.preventDefault(); handlePauseMarketplace(); }}>
             <LabelInputContainer>
               <Label htmlFor="adminCapId">AdminCap Object ID</Label>
               <Input id="adminCapId" value={adminCapId} onChange={e => setAdminCapId(e.target.value)} placeholder="Enter AdminCap Object ID" type="text" />
@@ -468,35 +472,64 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
               Add a new verified issuer to the registry. Please ensure all information is accurate.
             </DialogDescription>
           </DialogHeader>
-          <form className="my-8" onSubmit={e => {
-            e.preventDefault();
-            if (!addIssuerRegistryId || !addIssuerAddress || !addIssuerName || !addIssuerMetadataUri) return;
-            if (!currentAccount) {
-              triggerHeaderConnect();
-              return;
-            }
-            handleAddIssuer(addIssuerRegistryId, addIssuerAddress, addIssuerName, addIssuerMetadataUri);
-          }}>
+          <form
+            className="my-8"
+            onSubmit={e => {
+              e.preventDefault();
+              if (!addIssuerAddress || !addIssuerName || !addIssuerMetadataUri) return;
+              if (!currentAccount) {
+                triggerHeaderConnect();
+                return;
+              }
+              handleAddIssuer(addIssuerAddress, addIssuerName, addIssuerMetadataUri);
+              // Optionally reset fields here if needed
+              // setAddIssuerAddress(""); setAddIssuerName(""); setAddIssuerMetadataUri("");
+            }}
+          >
             <div className="space-y-4">
               <LabelInputContainer>
                 <Label htmlFor="issuerAddress">Issuer Address</Label>
-                <Input id="issuerAddress" value={addIssuerAddress} onChange={e => setAddIssuerAddress(e.target.value)} placeholder="Enter wallet address" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
+                <Input
+                  id="issuerAddress"
+                  name="addIssuerAddress" // <-- add this
+                  value={addIssuerAddress}
+                  onChange={e => setAddIssuerAddress(e.target.value)}
+                  placeholder="Enter wallet address"
+                  type="text"
+                  className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]"
+                />
               </LabelInputContainer>
               <LabelInputContainer>
                 <Label htmlFor="issuerName">Name</Label>
-                <Input id="issuerName" value={addIssuerName} onChange={e => setAddIssuerName(e.target.value)} placeholder="Enter issuer name" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
+                <Input
+                  id="issuerName"
+                  name="addIssuerName" // <-- add this
+                  value={addIssuerName}
+                  onChange={e => setAddIssuerName(e.target.value)}
+                  placeholder="Enter issuer name"
+                  type="text"
+                  className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]"
+                />
               </LabelInputContainer>
               <LabelInputContainer>
                 <Label htmlFor="metadataUri">Metadata URI</Label>
-                <Input id="metadataUri" value={addIssuerMetadataUri} onChange={e => setAddIssuerMetadataUri(e.target.value)} placeholder="Enter IPFS/HTTP link with KYC docs" type="text" className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="issuerRegistryId">IssuerRegistry Object ID</Label>
-                <Input id="issuerRegistryId" value={addIssuerRegistryId} onChange={e => setAddIssuerRegistryId(e.target.value)} placeholder="Enter Registry Object ID" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
+                <Input
+                  id="metadataUri"
+                  name="addIssuerMetadataUri" // <-- add this
+                  value={addIssuerMetadataUri}
+                  onChange={e => setAddIssuerMetadataUri(e.target.value)}
+                  placeholder="Enter IPFS/HTTP link with KYC docs"
+                  type="text"
+                  className="shadow-input dark:shadow-[0px_0px_1px_1px_#262626]"
+                />
               </LabelInputContainer>
               
+              
               <div className="mt-8">
-                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset] hover:text-black dark:hover:text-black">
+                <button
+                  type="submit"
+                  className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset] hover:text-black dark:hover:text-black"
+                >
                   Add Issuer →
                   <BottomGradient />
                 </button>
@@ -522,17 +555,14 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
               triggerHeaderConnect();
               return;
             }
-            handleDeactivateIssuer(deactivateRegistryId, deactivateAddress);
+            handleDeactivateIssuer(deactivateAddress);
           }}>
             <div className="space-y-4">
               <LabelInputContainer>
                 <Label htmlFor="deactivateAddress">Issuer Address</Label>
                 <Input id="deactivateAddress" value={deactivateAddress} onChange={e => setDeactivateAddress(e.target.value)} placeholder="Enter issuer wallet address" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
               </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="deactivateRegistryId">IssuerRegistry Object ID</Label>
-                <Input id="deactivateRegistryId" value={deactivateRegistryId} onChange={e => setDeactivateRegistryId(e.target.value)} placeholder="Enter Registry Object ID" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
+              
               
               <div className="mt-8">
                 <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-red-500 to-red-800 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]">
@@ -555,26 +585,34 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
             </DialogDescription>
           </DialogHeader>
           <form className="my-8" onSubmit={e => {
-            e.preventDefault();
-            if (!capRegistryId || !capIssuerAddress) return;
-            if (!currentAccount) {
-              triggerHeaderConnect();
-              return;
-            }
-            handleIssueCap(capRegistryId, capIssuerAddress);
-          }}>
+  e.preventDefault();
+  if (!capIssuerAddress) return;
+  if (!currentAccount) {
+    triggerHeaderConnect();
+    return;
+  }
+  handleIssueCap(capIssuerAddress);
+}}>
             <div className="space-y-4">
               <LabelInputContainer>
                 <Label htmlFor="capIssuerAddress">Issuer Address</Label>
                 <Input id="capIssuerAddress" value={capIssuerAddress} onChange={e => setCapIssuerAddress(e.target.value)} placeholder="Enter wallet address" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
               </LabelInputContainer>
               <LabelInputContainer>
-                <Label htmlFor="capRegistryId">IssuerRegistry Object ID</Label>
-                <Input id="capRegistryId" value={capRegistryId} onChange={e => setCapRegistryId(e.target.value)} placeholder="Enter Registry Object ID" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
+                <Label htmlFor="capRegistryId">Registry Object ID</Label>
+                <Input
+                  id="capRegistryId"
+                  value={capRegistryId}
+                  onChange={e => setCapRegistryId(e.target.value)}
+                  placeholder="Enter registry object ID"
+                  type="text"
+                  className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]"
+                />
               </LabelInputContainer>
               
+              
               <div className="mt-8">
-                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]">
+                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset]">
                   Issue Cap →
                   <BottomGradient />
                 </button>
@@ -594,43 +632,44 @@ const AdminDialogs: React.FC<AdminDialogsProps> = ({
             </DialogDescription>
           </DialogHeader>
           <form className="my-8" onSubmit={async e => {
-            e.preventDefault();
-            const form = e.target as HTMLFormElement;
-            const registryId = (form.elements.namedItem("checkRegistryId") as HTMLInputElement).value.trim();
-            const issuerAddress = (form.elements.namedItem("checkIssuerAddress") as HTMLInputElement).value.trim();
-            if (!registryId || !issuerAddress) {
-              setCheckIssuerError("Both fields are required.");
-              return;
-            }
-            if (!currentAccount) {
-              triggerHeaderConnect();
-              return;
-            }
-            await handleCheckIssuer(registryId, issuerAddress);
-          }}>
-            <div className="space-y-4">
-              <LabelInputContainer>
-                <Label htmlFor="checkIssuerAddress">Issuer Address</Label>
-                <Input id="checkIssuerAddress" name="checkIssuerAddress" placeholder="Enter issuer wallet address" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <LabelInputContainer>
-                <Label htmlFor="checkRegistryId">IssuerRegistry Object ID</Label>
-                <Input id="checkRegistryId" name="checkRegistryId" placeholder="Enter Registry Object ID" type="text" className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]" />
-              </LabelInputContainer>
-              <div className="mt-8">
-                <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-blue-500 to-blue-800 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset]">
-                  {checkIssuerLoading ? "Checking..." : "Check Issuer Status →"}
-                  <BottomGradient />
-                </button>
-              </div>
-              {checkIssuerResult && (
-                <div className="mt-4 text-green-600 dark:text-green-400 font-semibold">{checkIssuerResult}</div>
-              )}
-              {checkIssuerError && (
-                <div className="mt-4 text-red-600 dark:text-red-400 font-semibold">{checkIssuerError}</div>
-              )}
-            </div>
-          </form>
+  e.preventDefault();
+  if (!checkIssuerAddress) {
+    setCheckIssuerError("Issuer address is required.");
+    return;
+  }
+  if (!currentAccount) {
+    triggerHeaderConnect();
+    return;
+  }
+  await handleCheckIssuer(checkIssuerAddress);
+}}>
+  <div className="space-y-4">
+    <LabelInputContainer>
+      <Label htmlFor="checkIssuerAddress">Issuer Address</Label>
+      <Input
+        id="checkIssuerAddress"
+        name="checkIssuerAddress"
+        value={checkIssuerAddress}
+        onChange={e => setCheckIssuerAddress(e.target.value)}
+        placeholder="Enter issuer wallet address"
+        type="text"
+        className="shadow-input font-mono text-sm dark:shadow-[0px_0px_1px_1px_#262626]"
+      />
+    </LabelInputContainer>
+    <div className="mt-8">
+      <button type="submit" className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-blue-500 to-blue-800 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset]">
+        {checkIssuerLoading ? "Checking..." : "Check Issuer Status →"}
+        <BottomGradient />
+      </button>
+    </div>
+    {checkIssuerResult && (
+      <div className="mt-4 text-green-600 dark:text-green-400 font-semibold">{checkIssuerResult}</div>
+    )}
+    {checkIssuerError && (
+      <div className="mt-4 text-red-600 dark:text-red-400 font-semibold">{checkIssuerError}</div>
+    )}
+  </div>
+</form>
         </DialogContent>
       </Dialog>
 

@@ -10,8 +10,7 @@ const Footer: React.FC = () => {
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <div className="bg-marketplace-blue text-white font-bold text-xl px-2 py-1 rounded">RWA</div>
-              <span className="font-semibold text-xl text-white">Marketplace</span>
+              <span className="font-semibold text-xl text-white">Onlyassets</span>
             </div>
             <p className="text-sm mb-4">
               A next-generation platform for tokenized real-world assets, providing investors with access to premium investment opportunities.
@@ -79,7 +78,7 @@ const Footer: React.FC = () => {
         </div>
         
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between">
-          <p className="text-sm">© 2025 RWA Marketplace. All rights reserved.</p>
+          <p className="text-sm">© 2025 Onlyassets. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a href="#" className="text-sm hover:text-white transition-colors">Privacy Policy</a>
             <a href="#" className="text-sm hover:text-white transition-colors">Terms of Service</a>

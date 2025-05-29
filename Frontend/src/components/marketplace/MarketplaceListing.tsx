@@ -5,11 +5,12 @@ import { useOutsideClick } from '@/hooks/use-outside-click';
 import { ListingItem } from './types';
 import { CATEGORY_ICONS } from './constants';
 import { CloseIcon } from './CloseIcon';
-import { useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-const MARKETPLACE_PACKAGE_ID = '0xf3523d1917b7e6bbae4b8ccfdfcf091f6759eb2a29b5a01480f029fca16e7dbf';
+const MARKETPLACE_PACKAGE_ID = '0x113c52ac2155d7f2d98f0b99cf5587e11e38e4c1bfa323213845d4d2269408d5';
+const MARKETPLACE_OBJECT_ID = '0x6d678b07f64e6e6359e750f6d65018f75485ba3d3a30bdf74c517e0afaf7bfae'; // <-- Replace with your actual Marketplace object ID
 
 interface MarketplaceListingGridProps {
   items: ListingItem[];
@@ -29,6 +30,7 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
   const wallets = useWallets();
   const [showWallets, setShowWallets] = useState(false);
   const [pendingBuy, setPendingBuy] = useState<any>(null);
+  const client = useSuiClient();
 
   const sortedItems = React.useMemo(() => {
     let sortableItems = [...items];
@@ -80,19 +82,41 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
     buyFn();
   };
 
-  const handleBuy = async (marketplaceId: string, listingId: string, paymentCoinId: string) => {
-    await ensureWalletAndBuy({ marketplaceId, listingId, paymentCoinId }, () => {
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${MARKETPLACE_PACKAGE_ID}::marketplace::buy_asset`,
-        arguments: [
-          tx.object(marketplaceId),
-          tx.pure.address(listingId),
-          tx.object(paymentCoinId),
-        ],
-      });
-      signAndExecuteBuy({ transaction: tx, chain: 'sui:testnet' });
+  const handleBuy = async (assetId: string, price: number) => {
+    if (!currentAccount) {
+      setPendingBuy({ assetId, price });
+      setShowWallets(true);
+      return;
+    }
+    const coinObjectId = await getFirstSuiCoinId(currentAccount.address);
+    if (!coinObjectId) {
+      // Optionally show a toast: "No SUI coin found"
+      return;
+    }
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${MARKETPLACE_PACKAGE_ID}::marketplace::buy_asset`,
+      arguments: [
+        tx.object(MARKETPLACE_OBJECT_ID), // &mut Marketplace
+        tx.pure.address('0xcdd99b23321f9531e9577aceece38123d91430bf7d529eea51878b2b5c75f376'),         // asset_id: ID
+        tx.object(coinObjectId),
+                 // payment: Coin<SUI>
+      ],
     });
+    signAndExecuteBuy(
+      {
+        transaction: tx,
+        chain: 'sui:testnet',
+      },
+      {
+        onSuccess: (result) => {
+          setActive(null);
+        },
+        onError: (err) => {
+          // handle error
+        }
+      }
+    );
   };
 
   const WalletSelectDialog = () => (
@@ -114,7 +138,7 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
                       onSuccess: () => {
                         setShowWallets(false);
                         if (pendingBuy) {
-                          setTimeout(() => handleBuy(pendingBuy.marketplaceId, pendingBuy.listingId, pendingBuy.paymentCoinId), 100);
+                          setTimeout(() => handleBuy( pendingBuy.listingId, pendingBuy.paymentCoinId), 100);
                           setPendingBuy(null);
                         }
                       },
@@ -179,7 +203,7 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
           <Button
             onClick={e => {
               e.stopPropagation();
-              
+              handleBuy(id, price);
             }}
             className="px-3 py-1.5 text-sm rounded-full font-medium bg-marketplace-blue text-white hover:bg-marketplace-blue/90"
           >
@@ -265,6 +289,12 @@ const MarketplaceListing: React.FC<MarketplaceListingGridProps> = ({ items }) =>
         </motion.div>
       </div>
     );
+  };
+
+  const getFirstSuiCoinId = async (address: string) => {
+    const coins = await client.getCoins({ owner: address, coinType: '0x2::sui::SUI' });
+    if (!coins || !Array.isArray(coins.data) || coins.data.length === 0) return null;
+    return coins.data[0].coinObjectId;
   };
 
   return (

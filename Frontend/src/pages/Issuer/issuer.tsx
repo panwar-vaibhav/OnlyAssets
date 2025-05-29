@@ -10,6 +10,8 @@ import { IconHome, IconMessage, IconUser } from "@tabler/icons-react";
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast'; // or your toast library
+import { SuiClient } from '@mysten/sui/client';
 
 const assetTypes = [
   'Real Estate',
@@ -17,8 +19,14 @@ const assetTypes = [
   'Commodity',
 ];
 
+const metadataUriExample = 'https://example.com/metadata.json'; 
+
 const RWA_ASSET_PACKAGE_ID = '0xf62c99a340ecd1ae3faf18133f007ee1a391335202291394d3fab96957ca6d1c';
-const MARKETPLACE_PACKAGE_ID = '0xf3523d1917b7e6bbae4b8ccfdfcf091f6759eb2a29b5a01480f029fca16e7dbf';
+const MARKETPLACE_PACKAGE_ID = '0x113c52ac2155d7f2d98f0b99cf5587e11e38e4c1bfa323213845d4d2269408d5';
+
+const MARKETPLACE_OBJECT_ID = '0x6d678b07f64e6e6359e750f6d65018f75485ba3d3a30bdf74c517e0afaf7bfae';
+const ISSUER_REGISTRY_OBJECT_ID = '0x8c6a1311f5fde8f391320478aa2cb25bafce1fa3a371cd3a6417d8f2d7115ee0';
+const CLOCK_OBJECT_ID = '0x6';
 
 const navItems = [
   {
@@ -38,6 +46,9 @@ const navItems = [
   },
 ];
 
+const PACKAGE_ID = RWA_ASSET_PACKAGE_ID; // or your actual package id
+const suiClient = new SuiClient({ url: 'https://fullnode.testnet.sui.io' }); // or your node
+
 const Issuer: React.FC = () => {
   const [showNFTDialog, setShowNFTDialog] = useState(false);
   const [showFTDialog, setShowFTDialog] = useState(false);
@@ -52,19 +63,25 @@ const Issuer: React.FC = () => {
   const [nftMaturity, setNftMaturity] = useState('');
   const [nftHasApy, setNftHasApy] = useState(false);
   const [nftApy, setNftApy] = useState('');
-  const [nftRegistry, setNftRegistry] = useState('');
+  
+  // Step 1: Frontend-only state
+  const [mintStep, setMintStep] = useState(1);
+  const [nftTitle, setNftTitle] = useState('');
+  const [nftDescription, setNftDescription] = useState('');
+  const [nftImageUrl, setNftImageUrl] = useState('');
+  const [nftPriceToken, setNftPriceToken] = useState('USDC');
+  const [nftTier, setNftTier] = useState('Standard');
+  const [nftEarnXP, setNftEarnXP] = useState('32000');
 
   // FT form state
   const [ftCap, setFtCap] = useState('');
   const [ftMetadataUri, setFtMetadataUri] = useState('');
   const [ftAssetType, setFtAssetType] = useState(0);
   const [ftTotalSupply, setFtTotalSupply] = useState('');
-  const [ftRegistry, setFtRegistry] = useState('');
+  
 
   // List Asset form state
   const [listType, setListType] = useState<'nft' | 'ft'>('nft');
-  const [listMarketplace, setListMarketplace] = useState('');
-  const [listRegistry, setListRegistry] = useState('');
   const [listAssetId, setListAssetId] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [listClock, setListClock] = useState('');
@@ -74,9 +91,19 @@ const Issuer: React.FC = () => {
   const { mutate: signAndExecuteMintFT } = useSignAndExecuteTransaction();
   const { mutate: connectWallet } = useConnectWallet();
   const { mutate: signAndExecuteList } = useSignAndExecuteTransaction();
+  const { mutate: execListAsset } = useSignAndExecuteTransaction();
   const wallets = useWallets();
   const [showWallets, setShowWallets] = useState(false);
   const [pendingMint, setPendingMint] = useState<'nft' | 'ft' | null>(null);
+
+  // FT Step 1: Frontend-only state
+  const [ftMintStep, setFtMintStep] = useState(1);
+  const [ftTitle, setFtTitle] = useState('');
+  const [ftDescription, setFtDescription] = useState('');
+  const [ftImageUrl, setFtImageUrl] = useState('');
+  const [ftPriceToken, setFtPriceToken] = useState('USDC');
+  const [ftTier, setFtTier] = useState('Standard');
+  const [ftEarnXP, setFtEarnXP] = useState('32000');
 
   // Helper to trigger the ConnectButton in the header
   const triggerHeaderConnect = () => {
@@ -99,44 +126,59 @@ const Issuer: React.FC = () => {
   };
 
   // Handlers for NFT mint
-  const handleMintNFT = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nftCap || !nftMetadataUri || nftAssetType === undefined || !nftValuation || !nftRegistry) return;
-    await ensureWalletAndMint('nft', () => {
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_nft`,
-        arguments: [
-          tx.object(nftCap),
-          tx.pure.vector('u8', new TextEncoder().encode(nftMetadataUri)),
-          tx.pure.u8(Number(nftAssetType)),
-          tx.pure.u64(nftValuation),
-          tx.pure.bool(nftHasMaturity),
-          tx.pure.u64(nftHasMaturity ? Number(nftMaturity) : 0),
-          tx.pure.bool(nftHasApy),
-          tx.pure.u64(nftHasApy ? Number(nftApy) : 0),
-          tx.object(nftRegistry),
-        ],
-      });
-      signAndExecuteMintNFT({ transaction: tx, chain: 'sui:testnet' });
-      setShowNFTDialog(false);
+  const handleMintNFT = async () => {
+    console.log("handleMintNFT called");
+    if (  nftAssetType === undefined || !nftValuation) {
+      console.log("Validation failed");
+      return;
+    }
+
+    const userAddress = currentAccount?.address;
+    if (!userAddress) {
+      setPendingMint('nft');
+      setShowWallets(true);
+      return;
+    }
+
+    const issuerCapObjectId = '0xfabb29f3e363b50f66637ccc7c7238d07b507d8861a0b593f07b10d9ce789e05';
+    if (!issuerCapObjectId) {
+      toast.error('No IssuerCap found in your wallet.');
+      return;
+    }
+
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_nft`,
+      arguments: [
+        tx.object(issuerCapObjectId),
+        tx.pure.vector('u8', new TextEncoder().encode(metadataUriExample)),
+        tx.pure.u8(Number(nftAssetType)),
+        tx.pure.u64(nftValuation),
+        tx.pure.bool(nftHasMaturity),
+        tx.pure.u64(nftHasMaturity ? Number(nftMaturity) : 0),
+        tx.pure.bool(nftHasApy),
+        tx.pure.u64(nftHasApy ? Number(nftApy) : 0),
+        tx.object(ISSUER_REGISTRY_OBJECT_ID),
+      ],
     });
+    signAndExecuteMintNFT({ transaction: tx, chain: 'sui:testnet' });
+    setShowNFTDialog(false);
   };
 
   // Handlers for FT mint
   const handleMintFT = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ftCap || !ftMetadataUri || ftAssetType === undefined || !ftTotalSupply || !ftRegistry) return;
+    if (!ftCap || !ftMetadataUri || ftAssetType === undefined || !ftTotalSupply) return;
     await ensureWalletAndMint('ft', () => {
       const tx = new Transaction();
       tx.moveCall({
         target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_ft`,
         arguments: [
           tx.object(ftCap),
-          tx.pure.vector('u8', new TextEncoder().encode(ftMetadataUri)),
+          tx.pure.vector('u8', new TextEncoder().encode(metadataUriExample)),
           tx.pure.u8(Number(ftAssetType)),
           tx.pure.u64(ftTotalSupply),
-          tx.object(ftRegistry),
+          tx.object(ISSUER_REGISTRY_OBJECT_ID), // <--- Use constant here
         ],
       });
       signAndExecuteMintFT({ transaction: tx, chain: 'sui:testnet' });
@@ -147,32 +189,44 @@ const Issuer: React.FC = () => {
   // Handler for listing asset
   const handleListAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!listMarketplace || !listRegistry || !listAssetId || !listPrice || !listClock) return;
+    if (!listAssetId || !listPrice) return;
     const tx = new Transaction();
     if (listType === 'nft') {
       tx.moveCall({
         target: `${MARKETPLACE_PACKAGE_ID}::marketplace::list_asset_nft`,
         arguments: [
-          tx.object(listMarketplace),
-          tx.object(listRegistry),
+          tx.object(MARKETPLACE_OBJECT_ID),
+          tx.object(ISSUER_REGISTRY_OBJECT_ID),
           tx.object(listAssetId),
           tx.pure.u64(listPrice),
-          tx.object(listClock),
+          tx.object(CLOCK_OBJECT_ID),
         ],
       });
     } else {
       tx.moveCall({
         target: `${MARKETPLACE_PACKAGE_ID}::marketplace::list_asset_ft`,
         arguments: [
-          tx.object(listMarketplace),
-          tx.object(listRegistry),
+          tx.object(MARKETPLACE_OBJECT_ID),
+          tx.object(ISSUER_REGISTRY_OBJECT_ID),
           tx.object(listAssetId),
           tx.pure.u64(listPrice),
-          tx.object(listClock),
+          tx.object(CLOCK_OBJECT_ID),
         ],
       });
     }
-    signAndExecuteList({ transaction: tx, chain: 'sui:testnet' });
+
+    execListAsset(
+      { transaction: tx, chain: 'sui:testnet' },
+      {
+        onError: (err) => {
+          toast.error(err.message || 'Listing failed');
+        },
+        onSuccess: (result) => {
+          toast.success(`Listed! Digest: ${result.digest}`);
+          // Optionally refetch or update UI here
+        },
+      }
+    );
     setShowListDialog(false);
   };
 
@@ -198,7 +252,7 @@ const Issuer: React.FC = () => {
                       onSuccess: () => {
                         setShowWallets(false);
                         if (pendingMint === 'nft') {
-                          setTimeout(() => handleMintNFT(new Event('submit') as any), 100);
+                          setTimeout(() => handleMintNFT(), 100);
                         } else if (pendingMint === 'ft') {
                           setTimeout(() => handleMintFT(new Event('submit') as any), 100);
                         }
@@ -273,58 +327,99 @@ const Issuer: React.FC = () => {
               <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Mint Real-World Asset NFT</DialogTitle>
-                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">Fill in the details to mint a new RWA NFT.</DialogDescription>
+                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">
+                    {mintStep === 1
+                      ? "Enter display details for your asset (these are for frontend display only)."
+                      : "Fill in the details to mint a new RWA NFT."}
+                  </DialogDescription>
                 </DialogHeader>
-                <form className="my-6 space-y-5" onSubmit={handleMintNFT}>
-                  <LabelInputContainer>
-                    <Label htmlFor="nftCap">IssuerCap Object ID</Label>
-                    <Input id="nftCap" value={nftCap} onChange={e => setNftCap(e.target.value)} placeholder="Enter IssuerCap Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="nftMetadataUri">Metadata URI</Label>
-                    <Input id="nftMetadataUri" value={nftMetadataUri} onChange={e => setNftMetadataUri(e.target.value)} placeholder="Enter IPFS/HTTP link" type="text" className="shadow-input" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="nftAssetType">Asset Type</Label>
-                    <select id="nftAssetType" value={nftAssetType} onChange={e => setNftAssetType(Number(e.target.value))} className="shadow-input rounded-md px-3 py-2">
-                      {assetTypes.map((type, idx) => (
-                        <option key={type} value={idx}>{type}</option>
-                      ))}
-                    </select>
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="nftValuation">Valuation (u64)</Label>
-                    <Input id="nftValuation" value={nftValuation} onChange={e => setNftValuation(e.target.value)} placeholder="Enter asset valuation" type="number" className="shadow-input" />
-                  </LabelInputContainer>
-                  <div className="flex items-center gap-2">
-                    <input id="nftHasMaturity" type="checkbox" checked={nftHasMaturity} onChange={e => setNftHasMaturity(e.target.checked)} />
-                    <Label htmlFor="nftHasMaturity">Has Maturity?</Label>
-                  </div>
-                  {nftHasMaturity && (
+                {mintStep === 1 ? (
+                  <form className="my-6 space-y-5" onSubmit={e => { e.preventDefault(); setMintStep(2); }}>
                     <LabelInputContainer>
-                      <Label htmlFor="nftMaturity">Maturity (u64)</Label>
-                      <Input id="nftMaturity" value={nftMaturity} onChange={e => setNftMaturity(e.target.value)} placeholder="Enter maturity value" type="number" className="shadow-input" />
+                      <Label htmlFor="nftTitle">Title</Label>
+                      <Input id="nftTitle" value={nftTitle} onChange={e => setNftTitle(e.target.value)} placeholder="Enter asset title" type="text" className="shadow-input" />
                     </LabelInputContainer>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <input id="nftHasApy" type="checkbox" checked={nftHasApy} onChange={e => setNftHasApy(e.target.checked)} />
-                    <Label htmlFor="nftHasApy">Has APY?</Label>
-                  </div>
-                  {nftHasApy && (
                     <LabelInputContainer>
-                      <Label htmlFor="nftApy">APY (u64)</Label>
-                      <Input id="nftApy" value={nftApy} onChange={e => setNftApy(e.target.value)} placeholder="Enter APY value" type="number" className="shadow-input" />
+                      <Label htmlFor="nftDescription">Description</Label>
+                      <Input id="nftDescription" value={nftDescription} onChange={e => setNftDescription(e.target.value)} placeholder="Enter description" type="text" className="shadow-input" />
                     </LabelInputContainer>
-                  )}
-                  <LabelInputContainer>
-                    <Label htmlFor="nftRegistry">IssuerRegistry Object ID</Label>
-                    <Input id="nftRegistry" value={nftRegistry} onChange={e => setNftRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setShowNFTDialog(false)} className="rounded-md">Cancel</Button>
-                    <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Mint NFT</Button>
-                  </DialogFooter>
-                </form>
+                    <LabelInputContainer>
+                      <Label htmlFor="nftImageUrl">Image URL</Label>
+                      <Input id="nftImageUrl" value={nftImageUrl} onChange={e => setNftImageUrl(e.target.value)} placeholder="Enter image URL" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="nftPriceToken">Price Token</Label>
+                      <select id="nftPriceToken" value={nftPriceToken} onChange={e => setNftPriceToken(e.target.value)} className="shadow-input rounded-md px-3 py-2">
+                        <option value="USDC">USDC</option>
+                        <option value="SUI">SUI</option>
+                        <option value="USDT">USDT</option>
+                        {/* Add more tokens as needed */}
+                      </select>
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="nftTier">Tier</Label>
+                      <Input id="nftTier" value={nftTier} onChange={e => setNftTier(e.target.value)} placeholder="Standard" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="nftEarnXP">Earn XP</Label>
+                      <Input id="nftEarnXP" value={nftEarnXP} onChange={e => setNftEarnXP(e.target.value)} placeholder="32000" type="number" className="shadow-input" />
+                    </LabelInputContainer>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setShowNFTDialog(false)} className="rounded-md">Cancel</Button>
+                      <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Next</Button>
+                    </DialogFooter>
+                  </form>
+                ) : (
+                  <form className="my-6 space-y-5" onSubmit={(e) => {
+  e.preventDefault();
+  console.log("Form submitted - calling handleMintNFT");
+  handleMintNFT();
+}}>
+                    
+                    <LabelInputContainer>
+                      <Label htmlFor="nftAssetType">Asset Type</Label>
+                      <select id="nftAssetType" value={nftAssetType} onChange={e => setNftAssetType(Number(e.target.value))} className="shadow-input rounded-md px-3 py-2">
+                        {assetTypes.map((type, idx) => (
+                          <option key={type} value={idx}>{type}</option>
+                        ))}
+                      </select>
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="nftValuation">Valuation (u64)</Label>
+                      <Input id="nftValuation" value={nftValuation} onChange={e => setNftValuation(e.target.value)} placeholder="Enter asset valuation" type="number" className="shadow-input" />
+                    </LabelInputContainer>
+                    <div className="flex items-center gap-2">
+                      <input id="nftHasMaturity" type="checkbox" checked={nftHasMaturity} onChange={e => setNftHasMaturity(e.target.checked)} />
+                      <Label htmlFor="nftHasMaturity">Has Maturity?</Label>
+                    </div>
+                    {nftHasMaturity && (
+                      <LabelInputContainer>
+                        <Label htmlFor="nftMaturity">Maturity (u64)</Label>
+                        <Input id="nftMaturity" value={nftMaturity} onChange={e => setNftMaturity(e.target.value)} placeholder="Enter maturity value" type="number" className="shadow-input" />
+                      </LabelInputContainer>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input id="nftHasApy" type="checkbox" checked={nftHasApy} onChange={e => setNftHasApy(e.target.checked)} />
+                      <Label htmlFor="nftHasApy">Has APY?</Label>
+                    </div>
+                    {nftHasApy && (
+                      <LabelInputContainer>
+                        <Label htmlFor="nftApy">APY (u64)</Label>
+                        <Input id="nftApy" value={nftApy} onChange={e => setNftApy(e.target.value)} placeholder="Enter APY value" type="number" className="shadow-input" />
+                      </LabelInputContainer>
+                    )}
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setShowNFTDialog(false); setMintStep(1); }} className="rounded-md">Cancel</Button>
+                      <Button type="button" variant="outline" onClick={() => setMintStep(1)} className="rounded-md">Back</Button>
+                      <Button 
+      type="submit"
+      className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md"
+    >
+      Mint NFT
+    </Button>
+                    </DialogFooter>
+                  </form>
+                )}
               </DialogContent>
             </Dialog>
 
@@ -333,38 +428,74 @@ const Issuer: React.FC = () => {
               <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Mint Real-World Asset Fungible Token</DialogTitle>
-                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">Fill in the details to mint a new RWA Fungible Token.</DialogDescription>
+                  <DialogDescription className="text-base text-neutral-600 dark:text-neutral-300 mb-4">
+                    {ftMintStep === 1
+                      ? "Enter display details for your asset (these are for frontend display only)."
+                      : "Fill in the details to mint a new RWA Fungible Token."}
+                  </DialogDescription>
                 </DialogHeader>
-                <form className="my-6 space-y-5" onSubmit={handleMintFT}>
-                  <LabelInputContainer>
-                    <Label htmlFor="ftCap">IssuerCap Object ID</Label>
-                    <Input id="ftCap" value={ftCap} onChange={e => setFtCap(e.target.value)} placeholder="Enter IssuerCap Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="ftMetadataUri">Metadata URI</Label>
-                    <Input id="ftMetadataUri" value={ftMetadataUri} onChange={e => setFtMetadataUri(e.target.value)} placeholder="Enter IPFS/HTTP link" type="text" className="shadow-input" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="ftAssetType">Asset Type</Label>
-                    <select id="ftAssetType" value={ftAssetType} onChange={e => setFtAssetType(Number(e.target.value))} className="shadow-input rounded-md px-3 py-2">
-                      {assetTypes.map((type, idx) => (
-                        <option key={type} value={idx}>{type}</option>
-                      ))}
-                    </select>
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="ftTotalSupply">Total Supply (u64)</Label>
-                    <Input id="ftTotalSupply" value={ftTotalSupply} onChange={e => setFtTotalSupply(e.target.value)} placeholder="Enter total supply" type="number" className="shadow-input" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="ftRegistry">IssuerRegistry Object ID</Label>
-                    <Input id="ftRegistry" value={ftRegistry} onChange={e => setFtRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
+                {ftMintStep === 1 ? (
+                  <form className="my-6 space-y-5" onSubmit={e => { e.preventDefault(); setFtMintStep(2); }}>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftTitle">Title</Label>
+                      <Input id="ftTitle" value={ftTitle} onChange={e => setFtTitle(e.target.value)} placeholder="Enter asset title" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftDescription">Description</Label>
+                      <Input id="ftDescription" value={ftDescription} onChange={e => setFtDescription(e.target.value)} placeholder="Enter description" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftImageUrl">Image URL</Label>
+                      <Input id="ftImageUrl" value={ftImageUrl} onChange={e => setFtImageUrl(e.target.value)} placeholder="Enter image URL" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftPriceToken">Price Token</Label>
+                      <select id="ftPriceToken" value={ftPriceToken} onChange={e => setFtPriceToken(e.target.value)} className="shadow-input rounded-md px-3 py-2">
+                        <option value="USDC">USDC</option>
+                        <option value="SUI">SUI</option>
+                        <option value="USDT">USDT</option>
+                        {/* Add more tokens as needed */}
+                      </select>
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftTier">Tier</Label>
+                      <Input id="ftTier" value={ftTier} onChange={e => setFtTier(e.target.value)} placeholder="Standard" type="text" className="shadow-input" />
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftEarnXP">Earn XP</Label>
+                      <Input id="ftEarnXP" value={ftEarnXP} onChange={e => setFtEarnXP(e.target.value)} placeholder="32000" type="number" className="shadow-input" />
+                    </LabelInputContainer>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setShowFTDialog(false)} className="rounded-md">Cancel</Button>
+                      <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Next</Button>
+                    </DialogFooter>
+                  </form>
+                ) : (
+                  <form className="my-6 space-y-5" onSubmit={handleMintFT}>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftCap">IssuerCap Object ID</Label>
+                      <Input id="ftCap" value={ftCap} onChange={e => setFtCap(e.target.value)} placeholder="Enter IssuerCap Object ID" type="text" className="shadow-input font-mono text-sm" />
+                    </LabelInputContainer>
+                    
+                    <LabelInputContainer>
+                      <Label htmlFor="ftAssetType">Asset Type</Label>
+                      <select id="ftAssetType" value={ftAssetType} onChange={e => setFtAssetType(Number(e.target.value))} className="shadow-input rounded-md px-3 py-2">
+                        {assetTypes.map((type, idx) => (
+                          <option key={type} value={idx}>{type}</option>
+                        ))}
+                      </select>
+                    </LabelInputContainer>
+                    <LabelInputContainer>
+                      <Label htmlFor="ftTotalSupply">Total Supply (u64)</Label>
+                      <Input id="ftTotalSupply" value={ftTotalSupply} onChange={e => setFtTotalSupply(e.target.value)} placeholder="Enter total supply" type="number" className="shadow-input" />
+                    </LabelInputContainer>
+                  
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setShowFTDialog(false)} className="rounded-md">Cancel</Button>
                     <Button type="submit" className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md">Mint FT</Button>
                   </DialogFooter>
                 </form>
+                )}
               </DialogContent>
             </Dialog>
 
@@ -383,14 +514,8 @@ const Issuer: React.FC = () => {
                       <option value="ft">Fungible Token</option>
                     </select>
                   </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="listMarketplace">Marketplace Object ID</Label>
-                    <Input id="listMarketplace" value={listMarketplace} onChange={e => setListMarketplace(e.target.value)} placeholder="Enter Marketplace Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="listRegistry">IssuerRegistry Object ID</Label>
-                    <Input id="listRegistry" value={listRegistry} onChange={e => setListRegistry(e.target.value)} placeholder="Enter IssuerRegistry Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
+                  
+                 
                   <LabelInputContainer>
                     <Label htmlFor="listAssetId">Asset Object ID</Label>
                     <Input id="listAssetId" value={listAssetId} onChange={e => setListAssetId(e.target.value)} placeholder="Enter Asset NFT/FT Object ID" type="text" className="shadow-input font-mono text-sm" />
@@ -399,10 +524,7 @@ const Issuer: React.FC = () => {
                     <Label htmlFor="listPrice">Price (u64)</Label>
                     <Input id="listPrice" value={listPrice} onChange={e => setListPrice(e.target.value)} placeholder="Enter listing price" type="number" className="shadow-input" />
                   </LabelInputContainer>
-                  <LabelInputContainer>
-                    <Label htmlFor="listClock">Clock Object ID</Label>
-                    <Input id="listClock" value={listClock} onChange={e => setListClock(e.target.value)} placeholder="Enter Clock Object ID" type="text" className="shadow-input font-mono text-sm" />
-                  </LabelInputContainer>
+                  
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setShowListDialog(false)} className="rounded-md">Cancel</Button>
                     <Button type="submit" className="bg-green-600 text-white hover:bg-green-700 rounded-md">List Asset</Button>
