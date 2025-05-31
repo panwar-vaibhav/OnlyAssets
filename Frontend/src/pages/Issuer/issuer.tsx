@@ -7,12 +7,13 @@ import { LabelInputContainer } from '@/components/ui/form-utils';
 import { BackgroundLines } from "@/components/ui/background-lines";
 import { FloatingNav } from "@/components/ui/floating-navbar";
 import { IconHome, IconMessage, IconUser } from "@tabler/icons-react";
-import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets } from '@mysten/dapp-kit';
+import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction, useConnectWallet, useWallets,useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast'; // or your toast library
 import { SuiClient } from '@mysten/sui/client';
 import { Copy } from 'lucide-react'; // Import the copy icon
+import { uploadToPinata } from '@/utils/pinata';
 
 const assetTypes = [
   'Real Estate',
@@ -20,8 +21,6 @@ const assetTypes = [
   'Commodity',
 ];
 
-
-const metadataUriExample = 'https://exale.com/metadata.json'; 
 
 const RWA_ASSET_PACKAGE_ID = '0xf62c99a340ecd1ae3faf18133f007ee1a391335202291394d3fab96957ca6d1c';
 const MARKETPLACE_PACKAGE_ID = '0x113c52ac2155d7f2d98f0b99cf5587e11e38e4c1bfa323213845d4d2269408d5';
@@ -137,59 +136,78 @@ const Issuer: React.FC = () => {
 
   // Handlers for NFT mint
   const handleMintNFT = async () => {
-    console.log("handleMintNFT called");
-    if (nftAssetType === undefined || !nftValuation) {
-      console.log("Validation failed");
-      return;
-    }
-
-    const userAddress = currentAccount?.address;
-    if (!userAddress) {
-      setPendingMint('nft');
-      setShowWallets(true);
-      return;
-    }
-
-    const issuerCapObjectId = '0xfabb29f3e363b50f66637ccc7c7238d07b507d8861a0b593f07b10d9ce789e05';
-    if (!issuerCapObjectId) {
-      toast.error('No IssuerCap found in your wallet.');
-      return;
-    }
-
-    const tx = new Transaction();
-    tx.moveCall({
-      target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_nft`,
-      arguments: [
-        tx.object(issuerCapObjectId),
-        tx.pure.vector('u8', new TextEncoder().encode(metadataUriExample)),
-        tx.pure.u8(Number(nftAssetType)),
-        tx.pure.u64(nftValuation),
-        tx.pure.bool(nftHasMaturity),
-        tx.pure.u64(nftHasMaturity ? Number(nftMaturity) : 0),
-        tx.pure.bool(nftHasApy),
-        tx.pure.u64(nftHasApy ? Number(nftApy) : 0),
-        tx.object(ISSUER_REGISTRY_OBJECT_ID),
-      ],
-    });
-
-    signAndExecuteMintNFT(
-      {
-        transaction: tx,
-        chain: 'sui:testnet',
-        
-      },
-      {
-        onSuccess: (result) => {
-          
-          
-          setShowNFTDialog(false);
-        },
-        onError: (error) => {
-          console.error('Mint transaction failed:', error);
-          toast.error(`Failed to mint NFT: ${error.message}`);
-        }
+    try {
+      if (!nftImageFile) {
+        toast.error('Please upload an image');
+        return;
       }
-    );
+
+      // Upload to Pinata
+      const metadata = {
+        name: nftTitle,
+        description: nftDescription,
+        attributes: [
+          { trait_type: 'Asset Type', value: assetTypes[nftAssetType] },
+          { trait_type: 'Price Token', value: nftPriceToken },
+          { trait_type: 'Earn XP', value: nftEarnXP }
+        ]
+      };
+
+      const ipfsHash = await uploadToPinata(nftImageFile, metadata);
+      const metadataUri = `ipfs://${ipfsHash}`;
+
+      const userAddress = currentAccount?.address;
+      if (!userAddress) {
+        setPendingMint('nft');
+        setShowWallets(true);
+        return;
+      }
+
+      
+
+      const issuerCapObjectId = '0x5c13f77ad4adf4ce93c6a71e5f1a342c645bf75534c0dc0d19ffcaf541821163';
+      if (!issuerCapObjectId) {
+        toast.error('No IssuerCap found in your wallet.');
+        return;
+      }
+   
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_nft`,
+        arguments: [
+          tx.object(issuerCapObjectId),
+          tx.pure.vector('u8', new TextEncoder().encode(metadataUri)),
+          tx.pure.u8(Number(nftAssetType)),
+          tx.pure.u64(nftValuation),
+          tx.pure.bool(nftHasMaturity),
+          tx.pure.u64(nftHasMaturity ? Number(nftMaturity) : 0),
+          tx.pure.bool(nftHasApy),
+          tx.pure.u64(nftHasApy ? Number(nftApy) : 0),
+          tx.object(ISSUER_REGISTRY_OBJECT_ID),
+        ],
+      });
+
+      signAndExecuteMintNFT(
+        {
+          transaction: tx,
+          chain: 'sui:testnet',
+        },
+        {
+          onSuccess: (result) => {
+            resetNFTForm();
+            setShowNFTDialog(false);
+            toast.success('NFT minted successfully!');
+          },
+          onError: (error) => {
+            console.error('Mint transaction failed:', error);
+            toast.error(`Failed to mint NFT: ${error.message}`);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error in handleMintNFT:', error);
+      toast.error('Failed to mint NFT');
+    }
   };
 
   // Handlers for FT mint
@@ -202,7 +220,7 @@ const Issuer: React.FC = () => {
         target: `${RWA_ASSET_PACKAGE_ID}::rwaasset::mint_asset_ft`,
         arguments: [
           tx.object(ftCap),
-          tx.pure.vector('u8', new TextEncoder().encode(metadataUriExample)),
+          tx.pure.vector('u8', new TextEncoder().encode(ftMetadataUri)),
           tx.pure.u8(Number(ftAssetType)),
           tx.pure.u64(ftTotalSupply),
           tx.object(ISSUER_REGISTRY_OBJECT_ID), // <--- Use constant here
@@ -350,6 +368,23 @@ const Issuer: React.FC = () => {
     };
   }, [nftImageFile, ftImageFile]);
 
+  // Add this function after your state declarations and before your handlers
+  const resetNFTForm = () => {
+    setMintStep(1);
+    setNftTitle('');
+    setNftDescription('');
+    setNftImageFile(null);
+    setNftAssetType(0);
+    setNftPriceToken('USDC');
+    setNftEarnXP('32000');
+    setNftValuation('');
+    setNftHasMaturity(false);
+    setNftMaturity('');
+    setNftHasApy(false);
+    setNftApy('');
+    // If you have any other NFT-related state, reset it here
+  };
+
   if (!currentAccount) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black">
@@ -402,7 +437,12 @@ const Issuer: React.FC = () => {
             </div>
 
             {/* NFT Mint Dialog */}
-            <Dialog open={showNFTDialog} onOpenChange={setShowNFTDialog}>
+            <Dialog open={showNFTDialog} onOpenChange={(open) => {
+                if (!open) {
+                  resetNFTForm();
+                }
+                setShowNFTDialog(open);
+              }}>
               <DialogContent className="sm:max-w-lg rounded-2xl border border-neutral-200/30 dark:border-neutral-800 bg-white/90 dark:bg-black/90 shadow-2xl p-6 md:p-10 max-h-[90vh] overflow-hidden">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">Mint Real-World Asset NFT</DialogTitle>
@@ -505,14 +545,37 @@ const Issuer: React.FC = () => {
                   )}
                 </div>
                 <DialogFooter className="mt-6">
-                  <Button type="button" variant="outline" onClick={() => { setShowNFTDialog(false); setMintStep(1); }} className="rounded-md">Cancel</Button>
-                  <Button type="button" variant="outline" onClick={() => setMintStep(1)} className="rounded-md">Back</Button>
-                  <Button 
-      type="submit"
+                  <Button type="button" variant="outline" onClick={() => { resetNFTForm(); setShowNFTDialog(false); }} className="rounded-md">
+                    Cancel
+                  </Button>
+                  {mintStep === 1 ? (
+                    <Button 
+      type="button" 
+      onClick={() => {
+        if (!nftTitle || !nftDescription || !nftImageFile) {
+          toast.error('Please fill all required fields');
+          return;
+        }
+        setMintStep(2);
+      }} 
       className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md"
     >
-      Mint NFT
+      Next
     </Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setMintStep(1)} className="rounded-md">
+                        Back
+                      </Button>
+                      <Button 
+        type="button"
+        onClick={handleMintNFT}
+        className="bg-marketplace-blue text-white hover:bg-marketplace-blue/90 rounded-md"
+      >
+        Mint NFT
+      </Button>
+                    </>
+                  )}
                 </DialogFooter>
               </DialogContent>
             </Dialog>
