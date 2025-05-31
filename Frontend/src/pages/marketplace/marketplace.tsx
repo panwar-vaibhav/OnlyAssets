@@ -11,7 +11,7 @@ import { ConnectButton } from '@mysten/dapp-kit';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import WormholeConnect from '@wormhole-foundation/wormhole-connect';
+import WormholeConnect, { WormholeConnectConfig } from '@wormhole-foundation/wormhole-connect';
 
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
@@ -803,9 +803,9 @@ const WalletSelectDialog: React.FC<{
 
 // Update the SwapDialog component
 const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  // Define Wormhole Connect config
-  const config = {
-    network: 'Testnet',
+  // Define Wormhole Connect config with proper typing
+  const config: WormholeConnectConfig = {
+    network: "Testnet" as const, // explicitly type as "Testnet"
     chains: ['Ethereum', 'Sui'],
     rpcs: {
       Sui: 'https://fullnode.testnet.sui.io',
@@ -813,7 +813,6 @@ const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, on
     }
   };
 
-  // Define theme (optional)
   const theme = {
     background: {
       default: '#ffffff'
@@ -822,7 +821,7 @@ const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, on
       primary: '#000000'
     },
     button: {
-      action: '#1E40AF', // marketplace-blue color
+      action: '#1E40AF',
       actionText: '#FFFFFF'
     }
   };
@@ -836,7 +835,7 @@ const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, on
         </DialogHeader>
         <div className="h-[600px] w-full">
           <WormholeConnect 
-            config={config} 
+            config={config}
             theme={theme}
           />
         </div>
