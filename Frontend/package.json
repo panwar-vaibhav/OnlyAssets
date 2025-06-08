@@ -11,8 +11,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@hookform/resolvers": "^3.9.0",
     "@motionone/utils": "^10.18.0",
+    "@mui/material": "^5.17.1",
     "@mysten/dapp-kit": "^0.16.4",
     "@mysten/sui": "^1.30.0",
     "@radix-ui/react-accordion": "^1.2.0",

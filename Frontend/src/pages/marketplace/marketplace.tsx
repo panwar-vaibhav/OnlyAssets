@@ -11,8 +11,11 @@ import { ConnectButton } from '@mysten/dapp-kit';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
-import WormholeConnect, { WormholeConnectConfig } from '@wormhole-foundation/wormhole-connect';
-
+import WormholeConnect, {
+  WormholeConnectConfig,
+  WormholeConnectTheme,
+  dark
+} from '@wormhole-foundation/wormhole-connect';
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
 const MARKETPLACE_PACKAGE_ID = '0x113c52ac2155d7f2d98f0b99cf5587e11e38e4c1bfa323213845d4d2269408d5';
@@ -521,7 +524,7 @@ const ListingsGrid: React.FC<{ listings: MarketplaceListing[] }> = ({ listings }
               <div className="flex items-center gap-2">
                 <span className="text-gray-600">{listing.attributes?.find(attr => attr.trait_type === 'Asset Type')?.value}</span>
               </div>
-              <div className="text-gray-600">Asset NFT (ERC721)</div>
+              <div className="text-gray-600">Asset NFT</div>
               <div className="text-green-600">
                 Earn up to {listing.attributes?.find(attr => attr.trait_type === 'Earn XP')?.value || 0} XP
               </div>
@@ -803,37 +806,50 @@ const WalletSelectDialog: React.FC<{
 
 // Update the SwapDialog component
 const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  // Define Wormhole Connect config with proper typing
   const config: WormholeConnectConfig = {
-    network: "Testnet" as const, // explicitly type as "Testnet"
+    env: 'testnet',
+    network: 'Testnet',
     chains: ['Ethereum', 'Sui'],
     rpcs: {
-      Sui: 'https://fullnode.testnet.sui.io',
-      Ethereum: 'https://eth-sepolia.public.blastapi.io'
-    }
+      Ethereum: 'https://eth-sepolia.public.blastapi.io',
+      Sui: 'https://fullnode.testnet.sui.io'
+    },
+    tokens: ['ETH', 'WETH', 'USDC', 'SUI'],
   };
 
-  const theme = {
+  // Use the dark theme with minimal customization
+  const theme: WormholeConnectTheme = {
+    ...dark,
     background: {
-      default: '#ffffff'
+      ...dark.background,
+      default: '#1a1b1f',
+      secondary: '#2d2e33',
     },
     text: {
-      primary: '#000000'
+      primary: '#ffffff',
+      secondary: '#a0aec0',
     },
     button: {
-      action: '#1E40AF',
-      actionText: '#FFFFFF'
+      action: '#0052ff',
+      actionText: '#ffffff',
+      hover: '#0043cc',
+    },
+    border: {
+      default: '#2d2e33',
+    },
+    card: {
+      background: '#1a1b1f',
+      secondary: '#2d2e33',
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Swap Tokens</DialogTitle>
-          <DialogDescription>Transfer tokens across chains</DialogDescription>
-        </DialogHeader>
-        <div className="h-[600px] w-full">
+    <Dialog 
+      open={open} 
+      onOpenChange={onClose}
+    >
+      <DialogContent className="sm:max-w-[520px] p-0 bg-[#1a1b1f]">
+        <div className="h-[640px] overflow-hidden rounded-lg">
           <WormholeConnect 
             config={config}
             theme={theme}
