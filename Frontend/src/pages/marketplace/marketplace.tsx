@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
 import WormholeConnect, {
   WormholeConnectConfig,
-  WormholeConnectTheme,
-  dark
+  WormholeConnectTheme
 } from '@wormhole-foundation/wormhole-connect';
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
@@ -807,7 +806,7 @@ const WalletSelectDialog: React.FC<{
 // Update the SwapDialog component
 const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const config: WormholeConnectConfig = {
-    env: 'testnet',
+    
     network: 'Testnet',
     chains: ['Ethereum', 'Sui'],
     rpcs: {
@@ -815,44 +814,21 @@ const SwapDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, on
       Sui: 'https://fullnode.testnet.sui.io'
     },
     tokens: ['ETH', 'WETH', 'USDC', 'SUI'],
+    
   };
 
-  // Use the dark theme with minimal customization
-  const theme: WormholeConnectTheme = {
-    ...dark,
-    background: {
-      ...dark.background,
-      default: '#1a1b1f',
-      secondary: '#2d2e33',
-    },
-    text: {
-      primary: '#ffffff',
-      secondary: '#a0aec0',
-    },
-    button: {
-      action: '#0052ff',
-      actionText: '#ffffff',
-      hover: '#0043cc',
-    },
-    border: {
-      default: '#2d2e33',
-    },
-    card: {
-      background: '#1a1b1f',
-      secondary: '#2d2e33',
-    }
-  };
+  // Customize the theme
+  
 
   return (
     <Dialog 
       open={open} 
       onOpenChange={onClose}
     >
-      <DialogContent className="sm:max-w-[520px] p-0 bg-[#1a1b1f]">
+      <DialogContent className="sm:max-w-[520px] p-0">
         <div className="h-[640px] overflow-hidden rounded-lg">
           <WormholeConnect 
             config={config}
-            theme={theme}
           />
         </div>
       </DialogContent>
